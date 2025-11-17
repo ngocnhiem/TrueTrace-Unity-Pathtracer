@@ -12853,9 +12853,9 @@ MonoBehaviour:
         Pad1: 0
       left: 2
       isLeaf: 0
+    NodeCount: 0
     SGTree: []
     PrimCount: 768
-    FinalIndices: 
     MaxDepth: 12
     ParentList: []
     ZeroBound:
@@ -12972,7 +12972,7 @@ MonoBehaviour:
   LightBLASCopyKernel: 8
   CompactedMeshData: 0
   InstanceReferences: 0
-  NeedsToUpdate: 0
+  NeedsToUpdate: 1
   FailureCount: 0
   TotalTriangles: 0
   IsSkinnedGroup: 0
@@ -38148,7 +38148,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e9c10216ea5531c4d82893474778943b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  EnableDebugTexture: 0
+  EnableDebugTexture: 1
   EnableDebugTexturePrev: 0
   LocalTTSettingsName: DemoSceneMain
   HDRPorURPRenderInScene: 0
@@ -38216,6 +38216,7 @@ MonoBehaviour:
   IsFocusing: 0
   IsFocusingDelta: 0
   AGXCustomTex: {fileID: 0}
+  RaycastSelectedIndex: -1
   _currentSample: 0
   CurrentHorizonalPatch: {x: 0, y: 0}
   FramesSinceStart2: 0
@@ -38266,12 +38267,11 @@ MonoBehaviour:
   RenderTransforms: []
   RenderQue: []
   BuildQue:
-  - {fileID: 499686671}
-  - {fileID: 1770588100}
-  - {fileID: 1931085300}
+  - {fileID: 0}
   AddQue: []
   RemoveQue: []
-  UpdateQue: []
+  UpdateQue:
+  - {fileID: 0}
   InstanceRenderQue: []
   InstanceUpdateQue: []
   InstanceRenderTransforms: []
@@ -47618,9 +47618,9 @@ MonoBehaviour:
         Pad1: 0
       left: 2
       isLeaf: 0
+    NodeCount: 0
     SGTree: []
     PrimCount: 4864
-    FinalIndices: 
     MaxDepth: 18
     ParentList: []
     ZeroBound:
@@ -47644,7 +47644,7 @@ MonoBehaviour:
       cosTheta_oe: 0
       left: 0
   ExistsInQue: 1
-  QueInProgress: 1
+  QueInProgress: 2
   RenderImposters: 0
   IsDeformable: 0
   Name: sponza
@@ -55315,11 +55315,11 @@ MonoBehaviour:
   ConstructKernel: 0
   RefitLayerKernel: 1
   UpdateGlobalBufferAABBKernel: 3
-  LightBLASRefitKernel: 6
-  LightBLASCopyKernel: 8
+  LightBLASRefitKernel: 5
+  LightBLASCopyKernel: 6
   CompactedMeshData: 0
   InstanceReferences: 0
-  NeedsToUpdate: 0
+  NeedsToUpdate: 1
   FailureCount: 0
   TotalTriangles: 0
   IsSkinnedGroup: 0
@@ -61809,9 +61809,9 @@ MonoBehaviour:
         Pad1: 0
       left: 0
       isLeaf: 0
+    NodeCount: 0
     SGTree: []
     PrimCount: 0
-    FinalIndices: 
     MaxDepth: 0
     ParentList: []
     ZeroBound:
@@ -61928,7 +61928,7 @@ MonoBehaviour:
   LightBLASCopyKernel: 8
   CompactedMeshData: 3
   InstanceReferences: 0
-  NeedsToUpdate: 0
+  NeedsToUpdate: 1
   FailureCount: 0
   TotalTriangles: 0
   IsSkinnedGroup: 0

@@ -1040,16 +1040,16 @@ Toolbar toolbar;
 
             switch(Prop) {
                case((int)Properties.MatCapColor):
-                  MatShader.MatCapColorValue = ColorProperties[VerboseColorProperties.IndexOf(AvailableIndexes[i].title)];
+                  MatShader.MatCapColorValue = ColorProperties[ColorProperties.IndexOf(AvailableIndexes[i].title)];
                break;
                case((int)Properties.EmissionColor):
-                  MatShader.EmissionColorValue = ColorProperties[VerboseColorProperties.IndexOf(AvailableIndexes[i].title)];
+                  MatShader.EmissionColorValue = ColorProperties[ColorProperties.IndexOf(AvailableIndexes[i].title)];
                break;
                case((int)Properties.EmissionIntensity):
                   MatShader.EmissionIntensityValue = FloatProperties[VerboseFloatProperties.IndexOf(AvailableIndexes[i].title)];
                break;
                case((int)Properties.AlbedoColor):
-                  MatShader.BaseColorValue = ColorProperties[VerboseColorProperties.IndexOf(AvailableIndexes[i].title)];
+                  MatShader.BaseColorValue = ColorProperties[ColorProperties.IndexOf(AvailableIndexes[i].title)];
                break;
                case((int)Properties.AlbedoTexture):
                   MatShader.AvailableTextures.Add(new TexturePairs() {
@@ -1192,7 +1192,6 @@ Toolbar toolbar;
       }
       List<string> ChannelProperties;
       List<string> VerboseFloatProperties;
-      List<string> VerboseColorProperties;
       List<string> VerboseTextureProperties;
       public DialogueNode CreateInputNode(string PropertyID, System.Type T, Vector2 Pos, string InitialValue = "null", int InputElement = -1, bool IsRange = false, Texture SampleTex = null) 
       {
@@ -1234,8 +1233,8 @@ Toolbar toolbar;
            } else if(T == typeof(Color)) {
                DropField.choices = ColorProperties;
                DropField.index = (int)Mathf.Max(ColorProperties.IndexOf(InitialValue),0);
-               dialogueNode.title = VerboseColorProperties[DropField.index];
-               DropField.RegisterValueChangedCallback(evt => {dialogueNode.title = VerboseColorProperties[DropField.index];});
+               dialogueNode.title = ColorProperties[DropField.index];
+               DropField.RegisterValueChangedCallback(evt => {dialogueNode.title = ColorProperties[DropField.index];});
                dialogueNode.inputContainer.Add(DropField);
            }else if(T == typeof(float)) {
                   DropField.choices = FloatProperties;
@@ -1311,7 +1310,6 @@ Toolbar toolbar;
          TextureProperties = new List<string>();
          ChannelProperties = new List<string>();
          VerboseFloatProperties = new List<string>();
-         VerboseColorProperties = new List<string>();
          VerboseTextureProperties = new List<string>();
          int PropCount = shader.GetPropertyCount();
          ColorProperties.Add("null");
@@ -1322,12 +1320,11 @@ Toolbar toolbar;
          ChannelProperties.Add("B");
          ChannelProperties.Add("A");
 
-         VerboseColorProperties.Add("null");
          VerboseFloatProperties.Add("null");
          VerboseTextureProperties.Add("null");
          for(int i = 0; i < PropCount; i++) {
             if(shader.GetPropertyType(i) == ShaderPropertyType.Texture) {TextureProperties.Add(shader.GetPropertyName(i)); VerboseTextureProperties.Add(shader.GetPropertyName(i));}
-            if(shader.GetPropertyType(i) == ShaderPropertyType.Color) {ColorProperties.Add(shader.GetPropertyName(i)); VerboseColorProperties.Add(shader.GetPropertyDescription(i));}
+            if(shader.GetPropertyType(i) == ShaderPropertyType.Color) {ColorProperties.Add(shader.GetPropertyName(i));}
             if(shader.GetPropertyType(i) == ShaderPropertyType.Float || shader.GetPropertyType(i) == ShaderPropertyType.Range) {FloatProperties.Add(shader.GetPropertyName(i)); VerboseFloatProperties.Add(shader.GetPropertyDescription(i));}
          }
          MatShader = AssetManager.data.Material.Find((s1) => s1.Name.Equals(shader.name));
@@ -2651,6 +2648,7 @@ Toolbar toolbar;
                EditorUtility.SetDirty(Instanced);
                Instanced.ClearAll();
             }
+            if(RayMaster != null) RayMaster.ClearAll();
 
 
             Cleared = true;
@@ -2959,6 +2957,7 @@ Slider AperatureSlider;
                Assets.ClearAll();
                InstancedManager Instanced = GameObject.Find("InstancedStorage").GetComponent<InstancedManager>();
                EditorUtility.SetDirty(Instanced);
+               if(RayMaster != null) RayMaster.ClearAll();
                Instanced.ClearAll();
                Cleared = true;
                // Assets.RunningTasks = 0;

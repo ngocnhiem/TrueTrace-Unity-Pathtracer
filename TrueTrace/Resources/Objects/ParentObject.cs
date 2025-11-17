@@ -388,6 +388,29 @@ namespace TrueTrace {
             else TargList = new List<T>();
         }
 
+        void DecomposeHdrColor(Color linearColorHdr, out Vector3 baseLinearColor, out float exposure) {
+            byte k_MaxByteForOverexposedColor = 191;
+            baseLinearColor = (Vector3)(Vector4)linearColorHdr;
+            var maxColorComponent = linearColorHdr.maxColorComponent;
+            // replicate Photoshops's decomposition behaviour
+            if (maxColorComponent == 0f || maxColorComponent <= 1f && maxColorComponent >= 1 / 255f) {
+                exposure = 0f;
+
+                baseLinearColor.x = (byte)Mathf.RoundToInt(linearColorHdr.r * 255f);
+                baseLinearColor.y = (byte)Mathf.RoundToInt(linearColorHdr.g * 255f);
+                baseLinearColor.z = (byte)Mathf.RoundToInt(linearColorHdr.b * 255f);
+            } else {
+                // calibrate exposure to the max float color component
+                var scaleFactor = k_MaxByteForOverexposedColor / maxColorComponent;
+                exposure = Mathf.Log(255f / scaleFactor) / Mathf.Log(2f);
+
+                // maintain maximal integrity of byte values to prevent off-by-one errors when scaling up a color one component at a time
+                baseLinearColor.x = Math.Min(k_MaxByteForOverexposedColor, (byte)Mathf.CeilToInt(scaleFactor * linearColorHdr.r));
+                baseLinearColor.y = Math.Min(k_MaxByteForOverexposedColor, (byte)Mathf.CeilToInt(scaleFactor * linearColorHdr.g));
+                baseLinearColor.z = Math.Min(k_MaxByteForOverexposedColor, (byte)Mathf.CeilToInt(scaleFactor * linearColorHdr.b));
+            }
+        }
+
         List<int> IndexOffsets;
         public void CreateAtlas(ref int VertCount, ref int IndexCount)
         {//Creates texture atlas
@@ -483,10 +506,10 @@ namespace TrueTrace {
                     if(JustCreated || obj.LocalMaterials[i].DiffTransRemap.x == 0 && obj.LocalMaterials[i].DiffTransRemap.y == 0) obj.LocalMaterials[i].DiffTransRemap = new Vector2(0, 1);
                     if(!RelevantMat.BaseColorValue.Equals("null") && JustCreated) obj.LocalMaterials[i].BaseColor = (Vector3)((Vector4)SharedMaterials[i].GetColor(RelevantMat.BaseColorValue));
                     else if(JustCreated) obj.LocalMaterials[i].BaseColor = new Vector3(1,1,1);
-                    if(RelevantMat.EmissionColorValue != null && !RelevantMat.EmissionColorValue.Equals("null") && JustCreated) obj.LocalMaterials[i].EmissionColor = (Vector3)((Vector4)SharedMaterials[i].GetColor(RelevantMat.EmissionColorValue));
-                    else if(JustCreated) obj.LocalMaterials[i].EmissionColor = new Vector3(1,1,1);
+                    if(RelevantMat.EmissionColorValue != null && !RelevantMat.EmissionColorValue.Equals("null") && JustCreated) {
+                        DecomposeHdrColor(SharedMaterials[i].GetColor(RelevantMat.EmissionColorValue),  out obj.LocalMaterials[i].EmissionColor, out obj.LocalMaterials[i].emission);
+                    } else if(JustCreated) {obj.LocalMaterials[i].EmissionColor = new Vector3(1,1,1); obj.LocalMaterials[i].emission = 0;}
                     if(RelevantMat.EmissionIntensityValue != null && !RelevantMat.EmissionIntensityValue.Equals("null") && JustCreated) obj.LocalMaterials[i].emission = (SharedMaterials[i].GetFloat(RelevantMat.EmissionIntensityValue));
-                    else if(JustCreated) obj.LocalMaterials[i].emission = 0;
                     if(RelevantMat.IsGlass && JustCreated || (JustCreated && RelevantMat.Name.Equals("Standard") && SharedMaterials[i].GetFloat("_Mode") == 3)) obj.LocalMaterials[i].SpecTrans = 1f;
                     if(RelevantMat.IsCutout || (RelevantMat.Name.Equals("Standard") && SharedMaterials[i].GetFloat("_Mode") == 1)) obj.LocalMaterials[i].MatType = (int)RayTracingObject.Options.Cutout;
 
@@ -1455,8 +1478,8 @@ namespace TrueTrace {
                 for (int i3 = InitOff; i3 < IndEnd; i3++) {
                     V1 = CurMeshData.Verticies[i3] + Ofst;
                     V1 = TransMat * V1;
+                    if(float.IsNaN(V1.x) || float.IsNaN(V1.y) || float.IsNaN(V1.z)) V1 = Vector3.zero;
                     CurMeshData.Verticies[i3] = V1 - Ofst2;
-
                     Tan1 = TransMat.MultiplyVector((Vector3)CurMeshData.Tangents[i3]);
                     Normalize(ref Tan1);
                     TanPtr[i3] = CommonFunctions.PackOctahedral(Tan1);
@@ -1726,6 +1749,23 @@ namespace TrueTrace {
                 HasCompleted = false;
             }
         }
+
+        // public void OnDrawGizmos() {
+        //     if(LightTriangles != null) {
+        //         int Len = LightTriangles.Count;
+        //         for(int i = 0; i < Len; i++) {
+        //             Vector3 V0 = AggTriangles[LightTriangles[i].TriTarget].pos0;
+        //             Vector3 V1 = V0 + AggTriangles[LightTriangles[i].TriTarget].posedge1;
+        //             Vector3 V2 = V0 + AggTriangles[LightTriangles[i].TriTarget].posedge2;
+        //             V0 = transform.localToWorldMatrix * V0;
+        //             V1 = transform.localToWorldMatrix * V1;
+        //             V2 = transform.localToWorldMatrix * V2;
+        //             Gizmos.DrawLine(V0, V1);
+        //             Gizmos.DrawLine(V2, V1);
+        //             Gizmos.DrawLine(V0, V2);
+        //         }
+        //     }
+        // }
 
   }
 

@@ -268,11 +268,13 @@ inline void calcFinalColor(SmallerRay ray, inout ColData Color, MaterialData TTM
                 int Offset0 = 0;
                 #if defined(LBVH)
                     #ifdef DoubleBufferSGTree
-                        [branch]if(UseASVGF && RandomNums[uint2(pixel_index % screen_width, pixel_index / screen_width)].w == 1) {
-                            WorldToLoc = _MeshDataPrev[hit.mesh_id].W2L;
-                            Offset0 = LightTreePrimaryTLASOffset;
-                            [branch] if(_MeshData[hit.mesh_id].LightNodeSkinnedOffset != -1)
-                                Offset2 = _MeshData[hit.mesh_id].LightNodeSkinnedOffset;
+                        [branch]if(UseASVGF) {
+                            if(RandomNums[id].w == 1) {
+                                WorldToLoc = _MeshDataPrev[hit.mesh_id].W2L;
+                                Offset0 = LightTreePrimaryTLASOffset;
+                                [branch] if(_MeshData[hit.mesh_id].LightNodeSkinnedOffset != -1)
+                                    Offset2 = _MeshData[hit.mesh_id].LightNodeSkinnedOffset;
+                            }
                         }
 
                         CalcLightPDF(light_pdf, ray.origin, pos, ray.direction, pixel_index, WorldToLoc, AggTrisB[hit.triangle_id].IsEmissive, Offset2, Path, Offset0);
@@ -706,8 +708,8 @@ inline void calcFinalColor(SmallerRay ray, inout ColData Color, MaterialData TTM
                     if(DoExposure) maxillum *= Exposure[0];
                     if(!UseRussianRoulette || (CurBounce == 0 && (ImprovedPrimaryHit || DoPartialRendering))) maxillum = 1;
                     Illum *= rcp(saturate(maxillum));
-                    // bsdf_diffuse *= rcp(saturate(maxillum));
-                    bsdf_diffuse *= rcp(saturate(max(max(bsdf_diffuse.x, bsdf_diffuse.y), bsdf_diffuse.z)));
+                    bsdf_diffuse *= rcp(saturate(maxillum));
+                    // bsdf_diffuse *= rcp(saturate(max(max(bsdf_diffuse.x, bsdf_diffuse.y), bsdf_diffuse.z)));
 
                     if(luminance(Illum) != 0 && maxillum > random(117, pixel_index).y) {//NEE russian roulette, massively improves performance while giivng the same result
                         uint index3;

@@ -407,6 +407,7 @@ namespace TrueTrace {
             DoCheck = true;
             ReSTIRInitialized = false;
             if(TTPostProc != null) TTPostProc.ClearAll();
+            TTPostProc = null;
             _RayBuffer.ReleaseSafe();
             LightingBuffer.ReleaseSafe();
             _BufferSizes.ReleaseSafe();
