@@ -39,17 +39,10 @@ namespace TrueTrace {
         }
 
         public void Normalize(ref Vector3 a) {
-            float num = (float)Math.Sqrt((double)(a.x * a.x + a.y * a.y + a.z * a.z));
-            if (num > 9.99999974737875E-06) {
-                float inversed = 1 / num;
-                a.x *= inversed;
-                a.y *= inversed;
-                a.z *= inversed;
-            } else {
-                a.x = 0;
-                a.y = 0;
-                a.z = 0;
-            }
+            float inv = 1.0f / (float)Math.Sqrt((double)(a.x * a.x + a.y * a.y + a.z * a.z));
+            a.x *= inv;
+            a.y *= inv;
+            a.z *= inv;
         }
 
 
@@ -121,6 +114,7 @@ namespace TrueTrace {
         [HideInInspector] public bool NeedsToUpdate;
 
         public int FailureCount = 0;
+        public bool UnsafeToBuild = false;
 
         public int TotalTriangles;
         public bool IsSkinnedGroup;
@@ -633,6 +627,8 @@ namespace TrueTrace {
         }
         public List<Transform> ChildObjectTransforms;
         public unsafe void LoadData() {
+            TTStopWatch TempWatch = new TTStopWatch();
+            TempWatch.Start();
             CommonFunctions.DeepClean(ref LightTriNorms);
             CommonFunctions.DeepClean(ref CachedTransforms);
             CommonFunctions.DeepClean(ref TransformIndexes);
@@ -795,8 +791,13 @@ namespace TrueTrace {
 
                     var Norms = new List<Vector3>(VertCount2);
                     mesh.GetNormals(Norms);
-                    NativeArray<Vector3>.Copy(Norms.ToArray(), 0, CurMeshData.NormalsArray, CurMeshData.CurVertexOffset, CurVertCount);
-
+                    if(Norms.Count != 0) NativeArray<Vector3>.Copy(Norms.ToArray(), 0, CurMeshData.NormalsArray, CurMeshData.CurVertexOffset, CurVertCount);
+                    else {
+                        Debug.LogError("MESH " + gameObject.name + " IS MISSING VERTEX NORMALS");
+                        FailureCount++;
+                        UnsafeToBuild = true;
+                        return;
+                    }
                     mesh.GetVertices(Norms);
                     NativeArray<Vector3>.Copy(Norms.ToArray(), 0, CurMeshData.VerticiesArray, CurMeshData.CurVertexOffset, CurVertCount);
 
@@ -918,6 +919,7 @@ namespace TrueTrace {
                 });
                 RepCount += Mathf.Min(submeshcount, CurrentObject.Names.Length);
             }
+            TempWatch.Stop("LoadData");
         }
 
         public int TotalCounter = 0;
@@ -1419,16 +1421,17 @@ namespace TrueTrace {
             #endif
         }
 
+        float Dot(in Vector3 A, in Vector3 B) {return A.x * B.x + A.y * B.y + A.z * B.z;}
 
-        private float luminance(float r, float g, float b) { return 0.299f * r + 0.587f * g + 0.114f * b; }
-        private float luminance(Vector3 A) { return Vector3.Dot(new Vector3(0.299f, 0.587f, 0.114f), A);}
+        private float luminance(in float r, in float g, in float b) { return 0.299f * r + 0.587f * g + 0.114f * b; }
+        private float luminance(in Vector3 A) { return Dot(new Vector3(0.299f, 0.587f, 0.114f), A);}
 
 
         public unsafe async Task BuildTotal() {
 #if TTExtraVerbose && TTVerbose
             MainWatch = new TTStopWatch(Name);
 #endif
-            // if(HasCompleted) return;
+            if(UnsafeToBuild) return;
             int IllumTriCount = 0;
             CudaTriangle TempTri = new CudaTriangle();
             Matrix4x4 ParentMatInv = CachedTransforms[0].WTL;
@@ -1447,6 +1450,7 @@ namespace TrueTrace {
 #if TTExtraVerbose && TTVerbose
             MainWatch.Start();
 #endif
+
             AggTriangles = new CudaTriangle[(TransformIndexes[TransformIndexes.Count - 1].VertexStart + TransformIndexes[TransformIndexes.Count - 1].VertexCount) / 3];
             int OffsetReal = 0;
             aabb_untransformed = new AABB();
@@ -1474,21 +1478,42 @@ namespace TrueTrace {
                 uint* NormPtr = (uint*)CurMeshData.NormalsArray.GetUnsafeReadOnlyPtr();
                 uint* TanPtr = (uint*)CurMeshData.TangentsArray.GetUnsafeReadOnlyPtr();
                 uint* ColPtr = (uint*)CurMeshData.ColorsArray.GetUnsafeReadOnlyPtr();
-
+                Vector3 PrevNorm = Vector3.zero;
+                Vector3 PrevTan = Vector3.zero;
+                Vector3 CheckerNorm;
+                Vector4 CheckerTan;
                 for (int i3 = InitOff; i3 < IndEnd; i3++) {
                     V1 = CurMeshData.Verticies[i3] + Ofst;
                     V1 = TransMat * V1;
-                    if(float.IsNaN(V1.x) || float.IsNaN(V1.y) || float.IsNaN(V1.z)) V1 = Vector3.zero;
+                    // if(float.IsNaN(V1.x) || float.IsNaN(V1.y) || float.IsNaN(V1.z)) V1 = Vector3.zero;
                     CurMeshData.Verticies[i3] = V1 - Ofst2;
-                    Tan1 = TransMat.MultiplyVector((Vector3)CurMeshData.Tangents[i3]);
-                    Normalize(ref Tan1);
-                    TanPtr[i3] = CommonFunctions.PackOctahedral(Tan1);
 
-                    Norm1 = new Vector3(CurMeshData.Normals[i3].x * ScaleFactor.x, CurMeshData.Normals[i3].y * ScaleFactor.y, CurMeshData.Normals[i3].z * ScaleFactor.z);
-                    Norm1 = TransMat.MultiplyVector(Norm1);
-                    // Norm1 = TransMat * Scale(ScaleFactor, CurMeshData.Normals[i3]);
-                    Normalize(ref Norm1);
-                    NormPtr[i3] = CommonFunctions.PackOctahedral(Norm1);
+                    CheckerTan = *(CurMeshData.Tangents + i3);
+                    if(CheckerTan.x == PrevTan.x && CheckerTan.y == PrevTan.y && CheckerTan.z == PrevTan.z) {
+                        TanPtr[i3] = TanPtr[i3-1];
+                    } else {
+                        PrevTan.x = CheckerTan.x;
+                        PrevTan.y = CheckerTan.y;
+                        PrevTan.z = CheckerTan.z;
+                        Tan1 = TransMat.MultiplyVector(PrevTan);
+                        Normalize(ref Tan1);
+                        TanPtr[i3] = CommonFunctions.PackOctahedral(Tan1);
+                    }
+
+                    CheckerNorm = *(CurMeshData.Normals + i3);
+                    if(CheckerNorm.x == PrevNorm.x && CheckerNorm.y == PrevNorm.y && CheckerNorm.z == PrevNorm.z) {
+                        NormPtr[i3] = NormPtr[i3-1];
+                    } else {
+                        PrevNorm.x = CheckerNorm.x;
+                        PrevNorm.y = CheckerNorm.y;
+                        PrevNorm.z = CheckerNorm.z;
+                        CheckerNorm.x *= ScaleFactor.x;
+                        CheckerNorm.y *= ScaleFactor.y;
+                        CheckerNorm.z *= ScaleFactor.z;
+                        CheckerNorm = TransMat.MultiplyVector(CheckerNorm);
+                        Normalize(ref CheckerNorm);
+                        NormPtr[i3] = CommonFunctions.PackOctahedral(CheckerNorm);
+                    }
                     
                     ColPtr[i3] = CommonFunctions.packRGBE(CurMeshData.Colors[i3]);
                     
@@ -1663,7 +1688,8 @@ namespace TrueTrace {
         public bool HasTransformChanged = false;
         public void UpdateAABB(Transform transform) {//Update the Transformed AABB by getting the new Max/Min of the untransformed AABB after transforming it
             #if HardwareRT
-                for(int i = 0; i < Renderers.Length; i++) AssetManager.Assets.AccelStruct.UpdateInstanceTransform(Renderers[i]);
+                int RendLength = Renderers.Length;
+                for(int i = 0; i < RendLength; i++) AssetManager.Assets.AccelStruct.UpdateInstanceTransform(Renderers[i]);
             #else
                 Matrix4x4 Mat = transform.localToWorldMatrix;
                 Vector3 new_center = CommonFunctions.transform_position(Mat, center);
@@ -1689,7 +1715,7 @@ namespace TrueTrace {
             HasStarted = false;
             FailureCount = 0;
             if (gameObject.scene.isLoaded) {
-                if (this.GetComponentInParent<InstancedManager>() != null) {
+                if (this.GetComponentInParent<InstancedManager>() != null && this.GetComponentInParent<InstancedManager>().AddQue != null) {
                     this.GetComponentInParent<InstancedManager>().AddQue.Add(this);
                     this.GetComponentInParent<InstancedManager>().ParentCountHasChanged = true;
                     var Instances = FindObjectsOfType(typeof(InstancedObject)) as InstancedObject[];

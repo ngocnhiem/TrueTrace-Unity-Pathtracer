@@ -91,8 +91,10 @@ namespace TrueTrace {
         }
 
         float surface_area(ref AABB aabb) {
-            Vector3 d = new Vector3(aabb.BBMax.x - aabb.BBMin.x, aabb.BBMax.y - aabb.BBMin.y, aabb.BBMax.z - aabb.BBMin.z);
-            return (d.x + d.y) * d.z + d.x * d.y; 
+            float dx = aabb.BBMax.x - aabb.BBMin.x;
+            float dy = aabb.BBMax.y - aabb.BBMin.y;
+            float dz = aabb.BBMax.z - aabb.BBMin.z;
+            return (dx + dy) * dz + dx * dy; 
         }
 
    
@@ -127,7 +129,6 @@ namespace TrueTrace {
         private float* SAH;
         private bool* indices_going_left;
         private int* temp;
-        // public int[] FinalIndices;
         private int* RadixPrefixSum;
 
         public NativeArray<int> RadixPrefixArray;
@@ -223,9 +224,9 @@ namespace TrueTrace {
                 return;
             }
             partition_sah(first_index, index_count, nodes2[nodesi].aabb.b);
-            int Offset = split.dimension * PrimCount;
+            int* LocalDimensions = DimensionedIndices + split.dimension * PrimCount;
             int IndexEnd = first_index + index_count;
-            for(int i = first_index; i < IndexEnd; i++) indices_going_left[DimensionedIndices[Offset + i]] = i < split.index;
+            for(int i = first_index; i < IndexEnd; i++) indices_going_left[LocalDimensions[i]] = i < split.index;
 
             for(int dim = 0; dim < 3; dim++) {
                 if(dim == split.dimension) continue;
@@ -233,13 +234,17 @@ namespace TrueTrace {
                 int index;
                 int left = 0;
                 int right = split.index - first_index;
-                Offset = dim * PrimCount;
+                LocalDimensions = DimensionedIndices + dim * PrimCount;
                 for(int i = first_index; i < IndexEnd; i++) {
-                    index = DimensionedIndices[Offset + i];
+                    index = LocalDimensions[i];
                     temp[indices_going_left[index] ? (left++) : (right++)] = index;
                 }
-          
-                NativeArray<int>.Copy(tempArray, 0, DimensionedIndicesArray, Offset + first_index, index_count);
+              UnsafeUtility.MemCpy(
+                    destination: LocalDimensions + first_index,
+                    source: temp,
+                    size: index_count * 4
+                );
+
             }
             nodes2[nodesi].left = node_index;
 

@@ -2230,15 +2230,15 @@ inline uint GenHash(float3 Pos, float3 Norm) {
 
     Norm  = i_octahedral_32(octahedral_32(Norm));
     uint NormHash =
-        (Norm.x >= 0 ? 1 : 0) +
-        (Norm.y >= 0 ? 2 : 0) +
-        (Norm.z >= 0 ? 4 : 0);
+        (Norm.x >= 1e-7f ? 1 : 0) +
+        (Norm.y >= 1e-7f ? 2 : 0) +
+        (Norm.z >= 1e-7f ? 4 : 0);
 
     ThisHash |= (NormHash) << 29;
     return ThisHash;
 }
 
-inline uint GenHashPrecompedLayer(float3 Pos, const int Layer, const float3 Norm) {
+inline uint GenHashPrecompedLayer(float3 Pos, const int Layer, float3 Norm) {
 	Pos = abs(Pos) < 0.00001f ? 0.00001f : Pos;
 
     Pos = floor(Pos * 35.0f / pow(2, Layer));
@@ -2246,10 +2246,11 @@ inline uint GenHashPrecompedLayer(float3 Pos, const int Layer, const float3 Norm
     uint ThisHash = ((Pos2.x & 255) << 0) | ((Pos2.y & 255) << 8) | ((Pos2.z & 255) << 16);
     ThisHash |= (Layer & 31) << 24;
 
+    Norm  = i_octahedral_32(octahedral_32(Norm));
     uint NormHash =
-        (Norm.x >= 0 ? 1 : 0) +
-        (Norm.y >= 0 ? 2 : 0) +
-        (Norm.z >= 0 ? 4 : 0);
+        (Norm.x >= 1e-7f ? 1 : 0) +
+        (Norm.y >= 1e-7f ? 2 : 0) +
+        (Norm.z >= 1e-7f ? 4 : 0);
 
     ThisHash |= (NormHash) << 29;
     return ThisHash;

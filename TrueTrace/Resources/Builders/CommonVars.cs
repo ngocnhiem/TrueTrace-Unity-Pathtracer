@@ -865,7 +865,57 @@ namespace CommonVars
     }
 
 
+    public class HashedList<T>
+    {
+        private List<T> LocalList;
+        private HashSet<T> LocalHash;
 
+        public HashedList() {
+            this.LocalList = new List<T>();
+            this.LocalHash = new HashSet<T>();
+        }
+        public HashedList(in T[] Temp) {
+            this.LocalList = new List<T>(Temp);
+            this.LocalHash = new HashSet<T>(Temp);
+        }
+        public bool Add(T item) {
+            if(!LocalHash.Add(item)) return false;
+            LocalList.Add(item);
+            return true;
+        }
+
+        public bool Remove(T item) {
+            if(!LocalHash.Remove(item)) return false;
+            LocalList.Remove(item);
+            return true;
+        }
+
+        public bool Contains(T item) {
+            return LocalHash.Contains(item);
+        }
+
+        public int IndexOf(T item) {
+            if(LocalHash.Contains(item)) return LocalList.IndexOf(item);
+            else return -1;
+        }
+        public void RemoveAt(int i) {
+            LocalHash.Remove(LocalList[i]);
+            LocalList.RemoveAt(i);
+        }
+        public void Clear() {
+            LocalHash?.Clear();
+            LocalHash?.TrimExcess();
+            LocalList?.Clear();
+            LocalList?.TrimExcess();
+        }
+        public void Dispose() {
+            Clear();
+            LocalHash = null;
+            LocalList = null;
+        }
+        public int Count => LocalList.Count;
+        public T this[int i] => LocalList[i];
+    }  
 
 
     public struct TTStopWatch {//stopwatch stuff

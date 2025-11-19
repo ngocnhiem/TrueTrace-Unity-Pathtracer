@@ -87,7 +87,7 @@ void CacheResolve(uint3 id : SV_DispatchThreadID) {//we dont need to compress th
                 Dat *= Ratio;
                 ResultantVox.xyz = Dat * 1e3f;
             }
-            if(FrameCount > 230) {
+            if((FrameCount + ResultantHash) % 230 == 229) {
                 ResultantVox.xyz = (((float3)ResultantVox.xyz / 1e3f) / (float)(SampleCount + FrameCount)) * 1e3f;
                 FrameCount = 0;
                 SampleCount = 1;

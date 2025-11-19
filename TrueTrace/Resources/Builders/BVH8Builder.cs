@@ -343,10 +343,11 @@ namespace TrueTrace {
     }
 
         float surface_area(ref AABB aabb) {
-            Vector3 sizes = aabb.BBMax - aabb.BBMin;
-            return 2.0f * ((sizes.x * sizes.y) + (sizes.x * sizes.z) + (sizes.y * sizes.z)); 
+            float dx = aabb.BBMax.x - aabb.BBMin.x;
+            float dy = aabb.BBMax.y - aabb.BBMin.y;
+            float dz = aabb.BBMax.z - aabb.BBMin.z;
+            return (dx + dy) * dz + dx * dy; 
         }
-
 
 
         public BVH8Builder() {}//null constructor
