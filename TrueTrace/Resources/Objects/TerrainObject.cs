@@ -154,8 +154,10 @@ namespace TrueTrace {
                 Trans.gameObject.AddComponent<RayTracingObject>();
             }
             int ChildCount = Trans.childCount;
+            if(Trans.gameObject.TryGetComponent<LODGroup>(out LODGroup GroupTarg)) {
+               ChildCount = Mathf.Min(ChildCount, 1);
+            }
             for(int i = 0; i < ChildCount; i++) {
-               if(!Trans.GetChild(i).gameObject.name.Contains("LOD") || Trans.GetChild(i).gameObject.name.Contains("LOD0"))
                 TraverseChildren(Trans.GetChild(i), ref AddedList);
             }
         }

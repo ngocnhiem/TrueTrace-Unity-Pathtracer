@@ -451,7 +451,6 @@ inline void calcFinalColor(SmallerRay ray, inout ColData Color, MaterialData TTM
         #if DebugView == DVRadCache
             if(CurBounce == 0) _DebugTex[id.xy] = float4(ray.origin, asfloat(octahedral_32(Geomnorm)));
         #endif
-        float pdf3 = 0;
         // ReconstructBsdf2(TTMat, PrevDirection, ray.direction, Refracted ? -norm : norm, pdf3, bsdf, GetTangentSpace2(Refracted ? -norm : norm), pixel_index);
         [branch]if(luminance(Color.Indirect) <= 0.01f) {// || CurBounce < 3 //This may make some situations more accurate
             if(GetBounceData(CachePathLength) != 0){
@@ -460,23 +459,22 @@ inline void calcFinalColor(SmallerRay ray, inout ColData Color, MaterialData TTM
                 #endif
                 int Layer;
                 float VoxSize = GetVoxSize(pos, Layer);
+
                 if(VoxSize / (VoxSize + hit.t) <= random(433, pixel_index).x) {
                     Geomnorm = i_octahedral_32(octahedral_32(Geomnorm));
                     GridVoxel TempVox = RetrieveCacheData(GenHashPrecompedLayer(pos, Layer, Geomnorm));
-                    float3 Rad = TempVox.radiance / (float)max(TempVox.SampleNum,1);
-                    Color.Indirect += Rad * Color.throughput * bsdf;// * 2.0f;// * bsdf;
+                    float3 Rad = TempVox.radiance / (float)max(TempVox.SampleNum + TempVox.FrameNum,1);
+                    Color.Indirect += Rad * Color.throughput * bsdf;
 
                     if(MaterialLobe == 3 || Refracted) {
-                        TempVox = RetrieveCacheData(GenHash(pos, i_octahedral_32(octahedral_32(-Geomnorm))));
-                        Rad = TempVox.radiance / (float)max(TempVox.SampleNum,1);
-                        Color.Indirect += Rad * Color.throughput *  bsdf;// * 2.0f;// * bsdf;
+                        TempVox = RetrieveCacheData(GenHashPrecompedLayer(pos, Layer, i_octahedral_32(octahedral_32(-Geomnorm))));
+                        Rad = TempVox.radiance / (float)max(TempVox.SampleNum + TempVox.FrameNum,1);
+                        Color.Indirect += Rad * Color.throughput *  bsdf;
                     }
-                    #ifdef RadCache 
-                        if(luminance(Color.Indirect) > 0.0) {
-                            if(GTX.x % 2 == 0) return;
-                            else throughput *= 2.0f;
-                        }
-                    #endif
+                    if(luminance(Color.Indirect) > 0.0) {
+                        if(GTX.x % 2 == 0) return;
+                        else throughput *= 2.0f;
+                    }
 
                 }
             } else {
@@ -484,8 +482,6 @@ inline void calcFinalColor(SmallerRay ray, inout ColData Color, MaterialData TTM
             }
             CachePathLength = (CachePathLength & ~64) | ((MaterialLobe == 3) << 6);
         }
-    #endif
-    #ifdef RadCache 
         if(CurBounce > 4 && luminance(Color.Indirect) > 0.0) {
             if(GTX.x % 16 != 0) return;
             else throughput *= 16.0f;
@@ -1339,11 +1335,7 @@ int MaterialIndex;
         }
     }
     norm  = i_octahedral_32(octahedral_32(norm));
-    uint NormHash =
-        ((uint)(norm.x >= 1e-7f)) |
-        ((uint)(norm.y >= 1e-7f) << 1) |
-        ((uint)(norm.z >= 1e-7f) << 2);
-    PathLength = (PathLength & (~56)) | ((NormHash & 7) << 3);
+    PathLength = (PathLength & (~56)) | (((((uint)(norm.x >= 1e-7f)) | ((uint)(norm.y >= 1e-7f) << 1) | ((uint)(norm.z >= 1e-7f) << 2)) & 7) << 3);
     CacheBuffer[pixel_index].pathLength = PathLength;
 #endif
 

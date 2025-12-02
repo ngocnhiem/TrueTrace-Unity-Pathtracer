@@ -407,8 +407,11 @@ namespace TrueTrace {
             Parents.Children = new List<ParentData>();
             Parents.This = Parent;
             int ChildCount = Parent.childCount;
+            if(Parent.gameObject.TryGetComponent<LODGroup>(out LODGroup GroupTarg)) {
+               ChildCount = Mathf.Min(ChildCount, 1);
+            }
             for(int i = 0; i < ChildCount; i++) {
-               if(Parent.GetChild(i).gameObject.activeInHierarchy && !(Parent.GetChild(i).gameObject.name.Contains("LOD") && !Parent.GetChild(i).gameObject.name.Contains("LOD0"))) Parents.Children.Add(GrabChildren2(Parent.GetChild(i)));
+               if(Parent.GetChild(i).gameObject.activeInHierarchy) Parents.Children.Add(GrabChildren2(Parent.GetChild(i)));
 
             }
             return Parents;

@@ -461,9 +461,16 @@ namespace TrueTrace {
                 IndexCount += TempCount;
                 IndexOffsets.Add(TempCount);
 
-                if(obj.TryGetComponent<Renderer>(out Renderer TempRend)) SharedMaterials = TempRend.sharedMaterials;
-                else if(obj.TryGetComponent<SkinnedMeshRenderer>(out SkinnedMeshRenderer TempSkinRend)) SharedMaterials = TempSkinRend.sharedMaterials;
-                else SharedMaterials = new Material[1];
+                try {
+                    if(obj.TryGetComponent<Renderer>(out Renderer TempRend)) SharedMaterials = TempRend.sharedMaterials;
+                    else if(obj.TryGetComponent<SkinnedMeshRenderer>(out SkinnedMeshRenderer TempSkinRend)) SharedMaterials = TempSkinRend.sharedMaterials;
+                    else SharedMaterials = new Material[1];                    
+                } catch(System.Exception E) {
+                    Debug.Log("FUCKER: " + obj.gameObject.name);                    
+                    if(obj.TryGetComponent<Renderer>(out Renderer TempRend)) SharedMaterials = TempRend.sharedMaterials;
+                    else if(obj.TryGetComponent<SkinnedMeshRenderer>(out SkinnedMeshRenderer TempSkinRend)) SharedMaterials = TempSkinRend.sharedMaterials;
+                    else SharedMaterials = new Material[1];
+                }
                 int SharedMatLength = Mathf.Min(obj.Indexes.Length, SharedMaterials.Length);
                 int Offset = 0;
 
@@ -627,8 +634,6 @@ namespace TrueTrace {
         }
         public List<Transform> ChildObjectTransforms;
         public unsafe void LoadData() {
-            TTStopWatch TempWatch = new TTStopWatch();
-            TempWatch.Start();
             CommonFunctions.DeepClean(ref LightTriNorms);
             CommonFunctions.DeepClean(ref CachedTransforms);
             CommonFunctions.DeepClean(ref TransformIndexes);
@@ -919,7 +924,6 @@ namespace TrueTrace {
                 });
                 RepCount += Mathf.Min(submeshcount, CurrentObject.Names.Length);
             }
-            TempWatch.Stop("LoadData");
         }
 
         public int TotalCounter = 0;

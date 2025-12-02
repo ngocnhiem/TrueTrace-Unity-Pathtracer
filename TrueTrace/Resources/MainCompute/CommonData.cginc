@@ -363,16 +363,15 @@ inline float3 unpackRGBE(const uint x) {
     uint b = (x >> 18) & 0x1FF;
     return float3(r, g, b) * scale;
 }
-inline uint octahedral_32(const float3 nor) {
+inline uint octahedral_32(float3 nor) {
 	float oct = rcp(abs(nor.x) + abs(nor.y) + abs(nor.z));
-	float2 p = nor.xy * oct;
 	float t = saturate(-nor.z);
-	p.xy = (p.xy + (p.xy > 0.0f ? t : -t)) * oct;
-    uint2 d = uint2((int)(p.x * 32767.5f + 32767.5f + 0.5f), (int)(p.y * 32767.5f + 32767.5f + 0.5f));
-    return d.x | (d.y << 16);
+	nor.xy = (nor.xy + (nor.xy > 0.0f ? t : -t)) * oct;
+    uint2 d = uint2(round(32767.5 + nor.xy*32767.5));  
+    return d.x|(d.y<<16u);
 }
 
-inline float3 i_octahedral_32( const uint data ) {
+inline float3 i_octahedral_32(uint data ) {
     uint2 iv = uint2( data, data>>16u ) & 65535u; 
     float2 v = iv * (1.0f / 32767.5f) - 1.0f;
     float3 nor = float3(v, 1.0f - abs(v.x) - abs(v.y)); // Rune Stubbe's version,
@@ -1986,12 +1985,11 @@ inline uint GenHash(float3 Pos, float3 Norm) {
 	Pos = abs(Pos) < 0.00001f ? 0.00001f : Pos;
     int Layer = max(floor(0.5f * log2(dot(CamPos - Pos, CamPos - Pos)) + 1), 1);//length() seems to work better, but I reallly wanna find a way to make Dot() work, as thats wayyyy faster
 
-    Pos = floor(Pos * 35.0f / asfloat(1 << Layer));
+    Pos = floor(Pos * 35.0f / (float)(1 << Layer));
     uint3 Pos2 = asuint((int3)Pos);
     uint ThisHash = ((Pos2.x & 255) << 0) | ((Pos2.y & 255) << 8) | ((Pos2.z & 255) << 16);
     ThisHash |= (Layer & 31) << 24;
 
-    Norm  = i_octahedral_32(octahedral_32(Norm));
     uint NormHash =
         ((uint)(Norm.x >= 1e-7f)) |
         ((uint)(Norm.y >= 1e-7f) << 1) |
@@ -2004,12 +2002,11 @@ inline uint GenHash(float3 Pos, float3 Norm) {
 inline uint GenHashPrecompedLayer(float3 Pos, const int Layer, float3 Norm) {
 	Pos = abs(Pos) < 0.00001f ? 0.00001f : Pos;
 
-    Pos = floor(Pos * 35.0f / asfloat(1 << Layer));
+    Pos = floor(Pos * 35.0f / (float)(1 << Layer));
     uint3 Pos2 = asuint((int3)Pos);
     uint ThisHash = ((Pos2.x & 255) << 0) | ((Pos2.y & 255) << 8) | ((Pos2.z & 255) << 16);
     ThisHash |= (Layer & 31) << 24;
 
-    Norm  = i_octahedral_32(octahedral_32(Norm));
     uint NormHash =
         ((uint)(Norm.x >= 1e-7f)) |
         ((uint)(Norm.y >= 1e-7f) << 1) |
@@ -2022,14 +2019,14 @@ inline uint GenHashPrecompedLayer(float3 Pos, const int Layer, float3 Norm) {
 inline float GetVoxSize(float3 Pos, inout int Layer) {
 	Pos = abs(Pos) < 0.00001f ? 0.00001f : Pos;
     Layer = max(floor(0.5f * log2(dot(CamPos - Pos, CamPos - Pos)) + 1), 1);
-    return asfloat(1 << Layer) / 35.0f;
+    return (float)(1 << Layer) / 35.0f;
 }
 
 inline uint GenHashComputedNorm(float3 Pos, uint NormHash) {
 	Pos = abs(Pos) < 0.00001f ? 0.00001f : Pos;
     int Layer = max(floor(0.5f * log2(dot(CamPos - Pos, CamPos - Pos)) + 1), 1);//length() seems to work better, but I reallly wanna find a way to make Dot() work, as thats wayyyy faster
 
-    Pos = floor(Pos * 35.0f / asfloat(1 << Layer));
+    Pos = floor(Pos * 35.0f / (float)(1 << Layer));
     uint3 Pos2 = asuint((int3)Pos);
     uint ThisHash = ((Pos2.x & 255) << 0) | ((Pos2.y & 255) << 8) | ((Pos2.z & 255) << 16);
     ThisHash |= (Layer & 31) << 24;
