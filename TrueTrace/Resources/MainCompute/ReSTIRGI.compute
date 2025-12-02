@@ -76,7 +76,7 @@ inline bool VisabilityCheck(SmallerRay ray, float dist) {
         }
     #else
 #ifdef ReSTIRAdvancedValidation
-    Closest_Hit_Compute(ray, dist);
+    VisabilityCheckCompute(ray, dist);
     return dist;
 #else
     return VisabilityCheckCompute(ray, dist);
@@ -602,7 +602,7 @@ void ReSTIRGISpatial(uint3 id : SV_DispatchThreadID) {
             float4 SampleNEEPos = NEEPosB[CellTapCoord];
             SampleNorm = UnpackDirection24bit(PackedReservoirA.z);
             // if(!((PackedReservoirA.z >> 30) & 0x1)) continue;
-            CalcPosOnly(SampleWorldPos, SampleRayDir);
+            SampleRayDir = CalcPos(SampleWorldPos);
             SampleRayDir -= PrimaryHitPosition;
             
             float3 SampleNEERayDir = SampleNEEPos - PrimaryHitPosition;
@@ -835,7 +835,7 @@ void ReSTIRGISpatial2(uint3 id : SV_DispatchThreadID) {
             float4 SampleNEEPos = NEEPosB[CellTapCoord];
             SampleNorm = UnpackDirection24bit(PackedReservoirA.z);
             // if(!((PackedReservoirA.z >> 30) & 0x1)) continue;
-            CalcPosOnly(SampleWorldPos, SampleRayDir);
+            SampleRayDir = CalcPos(SampleWorldPos);
             SampleRayDir -= PrimaryHitPosition;
             
             float3 SampleNEERayDir = SampleNEEPos - PrimaryHitPosition;

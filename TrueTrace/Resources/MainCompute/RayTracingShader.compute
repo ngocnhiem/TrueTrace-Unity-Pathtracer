@@ -1,6 +1,8 @@
 // #include "UnityCG.cginc"
 #include "../GlobalDefines.cginc"
-
+#ifdef ReSTIRAdvancedValidation
+    #undef ReSTIRAdvancedValidation
+#endif
 #ifndef DX11
     #pragma use_dxc
     // #pragma enable_d3d11_debug_symbols
@@ -495,7 +497,7 @@ inline void calcFinalColor(SmallerRay ray, inout ColData Color, MaterialData TTM
 #ifdef ReSTIRSampleReduction
     bool D2 = true;
     if(UseReSTIRGI && CurBounce == 0) {
-        D2 = (int(id.x)/1 + int(id.y)/1 + curframe)%2==0;
+        D2 = (int(id.x)/1 + int(id.y)/1 + frames_accumulated)%2==0;
     }
     if(D2)
 #endif
@@ -750,7 +752,7 @@ inline void calcFinalColor(SmallerRay ray, inout ColData Color, MaterialData TTM
 
     bool CB = true;
     if(MaterialLobe == 2 && DoPartialRendering && CurBounce == 0) {
-        CB = (int(id.x)/PartialRenderingFactor + int(id.y)/PartialRenderingFactor + curframe)%2==0;
+        CB = (int(id.x)/PartialRenderingFactor + int(id.y)/PartialRenderingFactor + frames_accumulated)%2==0;
         if(UseASVGF) {
             if(TTMat.metallic == 1 || TTMat.specTrans == 1 || RandomNums[id].z != 0 || RandomNums[id].w != 0) CB = true;
         }
@@ -759,7 +761,7 @@ inline void calcFinalColor(SmallerRay ray, inout ColData Color, MaterialData TTM
     if(CB) {
 #ifdef ReSTIRSampleReduction
         if(UseReSTIRGI && CurBounce == 0) {
-            CB = (int(id.x)/1 + int(id.y)/1 + curframe)%2==0;
+            CB = (int(id.x)/1 + int(id.y)/1 + frames_accumulated)%2==0;
             if(!CB) return;
             else Color.throughput *= 2.0f;
         }
@@ -1337,7 +1339,11 @@ int MaterialIndex;
         }
     }
     norm  = i_octahedral_32(octahedral_32(norm));
-    PathLength = (PathLength & (~56)) | ((((norm.x >= 1e-7f ? 1 : 0) + (norm.y >= 1e-7f ? 2 : 0) + (norm.z >= 1e-7f ? 4 : 0)) & 7) << 3);
+    uint NormHash =
+        ((uint)(norm.x >= 1e-7f)) |
+        ((uint)(norm.y >= 1e-7f) << 1) |
+        ((uint)(norm.z >= 1e-7f) << 2);
+    PathLength = (PathLength & (~56)) | ((NormHash & 7) << 3);
     CacheBuffer[pixel_index].pathLength = PathLength;
 #endif
 

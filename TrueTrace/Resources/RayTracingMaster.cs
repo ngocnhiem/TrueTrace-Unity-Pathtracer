@@ -729,7 +729,6 @@ namespace TrueTrace {
             SetInt("MaxBounce", LocalTTSettings.bouncecount, cmd);
             SetInt("frames_accumulated", _currentSample, cmd);
             SetInt("ReSTIRGITemporalMCap", LocalTTSettings.ReSTIRGITemporalMCap, cmd);
-            SetInt("curframe", FramesSinceStart2, cmd);
             SetInt("TerrainCount", Assets.Terrains.Count, cmd);
             SetInt("RISCount", LocalTTSettings.RISCount, cmd);
             SetInt("BackgroundType", LocalTTSettings.BackgroundType, cmd);
@@ -757,7 +756,6 @@ namespace TrueTrace {
             SetBool("UseTransmittanceInNEE", LocalTTSettings.UseTransmittanceInNEE);
             OIDNGuideWrite = (FramesSinceStart == LocalTTSettings.OIDNFrameCount);
             SetBool("OIDNGuideWrite", OIDNGuideWrite && (LocalTTSettings.DenoiserMethod == 2 || LocalTTSettings.DenoiserMethod == 3));
-            SetBool("DiffRes", LocalTTSettings.RenderScale != 1.0f);
             SetBool("DoPartialRendering", LocalTTSettings.DoPartialRendering);
             SetBool("DoExposure", LocalTTSettings.PPExposure);
             ShadingShader.SetBuffer(ShadeKernel, "Exposure", TTPostProc.ExposureBuffer);
