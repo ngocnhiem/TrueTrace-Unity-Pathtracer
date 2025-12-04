@@ -30,6 +30,9 @@ namespace TrueTrace {
         [SerializeField] public float RenderScale = 1.0f;
         [SerializeField] public int DenoiserMethod = 0;
         [SerializeField] public int UpscalerMethod = 0;
+        [SerializeField] public bool UseReSTIRDI = false;
+        [SerializeField] public bool UseReSTIRDITemporal = true;
+        [SerializeField] public bool UseReSTIRDISpatial = true;
         [SerializeField] public bool UseReSTIRGITemporal = true;
         [SerializeField] public bool UseReSTIRGISpatial = true;
         [SerializeField] public bool UseReSTIRGI = false;
