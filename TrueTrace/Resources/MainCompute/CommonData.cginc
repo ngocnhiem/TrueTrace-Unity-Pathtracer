@@ -2538,3 +2538,57 @@ float3 phase_draine_sample(const float2 xi, const float3 wi, const float g, cons
     const float z2 = sqrt(1.0 - deflection_cos * deflection_cos);
     return mul(make_frame(wi), float3(z2 * cos(2.0f * PI * xi.y), z2 * sin(2.0f * PI * xi.y), deflection_cos));
 }
+
+#define ENERGY_MANTISSA_BITS 20
+#define THREADID_BITS 8
+#define TILE_PIXELS 64
+// Helper functions ----------------------------------------------------------
+uint PackKeyBits(uint geomKey4, uint energy20, uint thread8) {
+    // geomKey4 occupy most-significant 4 bits of the 32-bit field portion:
+    // final layout (MSB -> LSB): [geomKey:4][energy:20][threadid:8]
+    return ( (geomKey4 & 0xF) << (ENERGY_MANTISSA_BITS + THREADID_BITS) ) |
+           ( (energy20 & ((1<<ENERGY_MANTISSA_BITS)-1)) << THREADID_BITS ) |
+           ( thread8 & ((1<<THREADID_BITS)-1) );
+}
+
+// Octahedral quantize to 8x8 index (0..63)
+uint OctahedralEncode8x8(float3 n) {
+    // expects normalized n
+    float2 p = n.xy / (abs(n.x) + abs(n.y) + abs(n.z));
+    if (n.z < 0.0f) {
+        float2 sign = (p.x >= 0.0f) ? 1.0f : -1.0f;
+        p = (1.0f - abs(p.yx)) * float2(sign.x, sign.y);
+    }
+    // map p from [-1,1] to [0,7] (8 bins)
+    float fx = (p.x * 0.5f + 0.5f) * 7.0f;
+    float fy = (p.y * 0.5f + 0.5f) * 7.0f;
+    int ix = clamp((int)floor(fx + 0.5f), 0, 7);
+    int iy = clamp((int)floor(fy + 0.5f), 0, 7);
+    return (uint)(iy * 8 + ix); // 0..63
+}
+
+// Build 8-direction + top/bottom 3-bit code (0..7)
+// bins: 0 => top-hemisphere (near avg direction)
+// 1..6 => directional sectors (6)
+// 7 => bottom-hemisphere (opposite of top)
+uint EncodeTo8SphereBins(float3 n, float3 tbnZ, float thresholdCos) {
+    // n and tbnZ are normalized
+    float cosZ = dot(n, tbnZ);
+    if (cosZ >= thresholdCos) return 0; // top
+    if (cosZ <= -thresholdCos) return 7; // bottom
+
+    // project onto tangent plane and quantize to 6 directional bins around
+    // compute angle in local tangent coordinates
+    // build tangent+bitangent easily from tbnZ (rough but valid)
+    float3 tangent = normalize(abs(tbnZ.x) < 0.9 ? cross(tbnZ, float3(1,0,0)) : cross(tbnZ, float3(0,1,0)));
+    float3 bitangent = cross(tbnZ, tangent);
+    float lx = dot(n, tangent);
+    float ly = dot(n, bitangent);
+    float angle = atan2(ly, lx); // -pi..pi
+    // map to 6 sectors: each sector size = 2*pi/6
+    const float sector = 3.14159265359f * 2.0f / 6.0f;
+    int sectorIdx = (int)floor((angle + 3.14159265359f) / sector) % 6; // 0..5
+    return 1u + (uint)sectorIdx; // 1..6
+}
+
+

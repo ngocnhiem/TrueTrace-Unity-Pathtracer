@@ -1,14 +1,65 @@
-// Each #kernel tells which function to compile; you can have many kernels
-#pragma kernel CSMain
+// #include "../GlobalDefines.cginc"
+// #ifdef ReSTIRAdvancedValidation
+//     #undef ReSTIRAdvancedValidation
+// #endif
+// #ifndef DX11
+//     #pragma use_dxc
+//     // #pragma enable_d3d11_debug_symbols
+// #endif
+// #include "CommonData.cginc"
+// #include "Materials.cginc"
 
-// Create a RenderTexture with enableRandomWrite flag and set it
-// with cs.SetTexture
-RWTexture2D<float4> Result;
+// RWStructuredBuffer<LightBlockData> WriteBlocks;
 
-[numthreads(8,8,1)]
-void CSMain (uint3 id : SV_DispatchThreadID)
-{
-    // TODO: insert actual code here!
+// /* ----
+//     Data I need for surface reconstruction for the SGTree sampling:
+        
 
-    Result[id.xy] = float4(id.x & id.y, (id.x & 15)/15.0, (id.y & 15)/15.0, 0.0);
-}
+
+// ---- */
+
+
+// #pragma kernel kernel_reservoir_precompute
+
+// [numthreads(16,16,1)]
+// void kernel_reservoir_precompute (uint3 id : SV_DispatchThreadID, uint3 id2 : SV_GroupThreadID, uint3 id3 : SV_GroupID) {//Moved final accumulation into its own kernel, improves performance
+//     int pixel_index = (id.x + id.y * screen_width);
+//     for(int i = 0; i < 8; i++) {
+//         bool UseUnityLight = false;//(unitylightcount != 0) ? (LightMeshCount != 0) ? (random(i).x <= (_UnityLights[unitylightcount - 1].CDF / (_UnityLights[unitylightcount - 1].CDF + _LightMeshes[LightMeshCount - 1].CDF))) : true : false;//Choose whether to sample unity lights or mesh lights based off which is more powerful
+//         int lighttosample;
+//         float w;
+//         int LightMesh = 0;
+//         float3 LightNorm;
+//         float3 lightPos;
+//         int LightMeshIndex;
+//         float3 Radiance;
+//         int LightType = -1;
+//         if(UseUnityLight) {
+//             lighttosample = floor(min(random(i).y * unitylightcount, unitylightcount - 1));
+//             LightData light = _UnityLights[lighttosample];
+//             lightPos = light.Position;
+//             LightNorm = -light.Direction;
+//             Radiance = light.Radiance;
+//             LightMeshIndex = -1;
+//             LightType = light.Type;
+//         } else {
+//             LightMeshIndex = floor(min(random(i + 16).x * LightMeshCount, LightMeshCount - 1));
+//             const LightMeshData LightMesh = _LightMeshes[LightMeshIndex];
+//             const int StartIndex = LightMesh.StartIndex;
+//             const int IndexEnd = LightMesh.IndexEnd;
+//             lighttosample = clamp((random(i + 16).y * (IndexEnd - StartIndex)) + StartIndex, StartIndex, IndexEnd - 1);
+//             const LightTriangleData Light = LightTriangles[lighttosample];
+//             float2 CurUv = sample_triangle(random(i + 32).x, random(i + 32).y);
+//             lightPos = mul(LightMesh.Inverse, float4(Light.pos0 + CurUv.x * Light.posedge1 + CurUv.y * Light.posedge2,0)).xyz + LightMesh.Center;
+//             LightNorm = normalize(mul(LightMesh.Inverse, float4(Light.Norm, 0.0f)).xyz);
+//             Radiance = Light.radiance;
+//         }
+//         WriteBlocks[id2.x * 8 + i + id3.x * 512].Pos = lightPos;
+//         WriteBlocks[id2.x * 8 + i + id3.x * 512].Norm = LightNorm;
+//         WriteBlocks[id2.x * 8 + i + id3.x * 512].Rad = Radiance;
+//         WriteBlocks[id2.x * 8 + i + id3.x * 512].Misc = float3(LightMeshIndex, lighttosample, LightType);
+//     }
+
+
+
+// }
