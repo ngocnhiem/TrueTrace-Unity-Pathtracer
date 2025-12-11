@@ -698,7 +698,7 @@ inline bool triangle_intersect_shadow(int tri_id, const SmallerRay ray, const fl
     }
     return false;
 }
-inline void triangle_intersect_dist(int tri_id, const SmallerRay ray, inout float max_distance, int mesh_id, const int MatOffset) {
+inline void triangle_intersect_dist(const int tri_id, const SmallerRay ray, inout float max_distance, const int MatOffset) {
     TrianglePos tri = triangle_get_positions(tri_id);
 
     float3 h = cross(ray.direction, tri.posedge2);
@@ -721,7 +721,7 @@ inline void triangle_intersect_dist(int tri_id, const SmallerRay ray, inout floa
 				if(GetFlag(_IntersectionMaterials[MaterialIndex].Tag, IsBackground) || GetFlag(_IntersectionMaterials[MaterialIndex].Tag, ShadowCaster)) return; 
         		[branch] if(_IntersectionMaterials[MaterialIndex].MatType == CutoutIndex) {
 	                float2 BaseUv = TriUVs.UV0 * (1.0f - u - v) + TriUVs.UV1 * u + TriUVs.UV2 * v;
-                    if(_IntersectionMaterials[MaterialIndex].MatType == CutoutIndex && _IntersectionMaterials[MaterialIndex].AlphaTex.x > 0) {
+                    if(_IntersectionMaterials[MaterialIndex].AlphaTex.x > 0) {
                     	float Alph = SampleTexture(BaseUv, SampleAlpha, _IntersectionMaterials[MaterialIndex]).x;
                         if((GetFlag(_IntersectionMaterials[MaterialIndex].Tag, InvertAlpha) ? (1.0f - Alph) : Alph) < _IntersectionMaterials[MaterialIndex].AlphaCutoff) return;
                     }
@@ -837,14 +837,15 @@ inline bool VisabilityCheckCompute(SmallerRay ray, inout float dist) {
     ray2 = ray;
 
     oct_inv4 = ray_get_octant_inv4(ray.direction);
+#ifndef ReSTIRAdvancedValidation
     float3 through = 0;
-
+#endif
     current_group.x = (uint)0;
     current_group.y = (uint)0x80000000;
     int MatOffset = 0;
     int Reps = 0;
+	uint2 triangle_group;
     [loop] while (Reps < MaxTraversalSamples) {//Traverse Accelleration Structure(Compressed Wide Bounding Volume Hierarchy)            
-    	uint2 triangle_group;
         [branch]if (current_group.y > 0x00FFFFFF) {
             uint child_index_offset = firstbithigh(current_group.y);
             
@@ -899,7 +900,7 @@ inline bool VisabilityCheckCompute(SmallerRay ray, inout float dist) {
                     uint triangle_index = firstbithigh(triangle_group.y);
                     triangle_group.y &= ~(1 << triangle_index);
 #ifdef ReSTIRAdvancedValidation
-                    triangle_intersect_dist(triangle_group.x + triangle_index, ray, dist, mesh_id, MatOffset);
+                    triangle_intersect_dist(triangle_group.x + triangle_index, ray, dist, MatOffset);
 #else
                     if(triangle_intersect_shadow(triangle_group.x + triangle_index, ray, dist, through, MatOffset)) return false;
 #endif

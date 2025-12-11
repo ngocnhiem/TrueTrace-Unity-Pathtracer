@@ -133,6 +133,11 @@ namespace TrueTrace {
          [SerializeField] public float aoRadius = 2.0f;
 
 
+         [SerializeField] public TTSettings PanoPreset;
+         [SerializeField] public TTSettings AnimationPreset;
+         [SerializeField] public TTSettings PresentationPreset;
+
+
 
          public bool GetGlobalDefine(string DefineToGet) {
             string globalDefinesPath = TTPathFinder.GetGlobalDefinesPath();
@@ -1746,7 +1751,7 @@ Toolbar toolbar;
                // GIToggle.RegisterValueChangedCallback(evt => {ReSTIRGI = evt.newValue; RayMaster.LocalTTSettings.UseReSTIRGI = ReSTIRGI;if(evt.newValue) MainSource.Insert(MainSource.IndexOf(GIToggle) + 1, GIFoldout); else MainSource.Remove(GIFoldout);});
                if(CustToggle.value) ParentContainer.Add(ToggleableContainer);
             } else {
-               CustToggle.RegisterValueChangedCallback(evt => {SetGlobalDefines(TargetDefine, evt.newValue);});
+               CustToggle.RegisterValueChangedCallback(evt => {if(TargetDefine.Equals("RadCache")) RayMaster.LocalTTSettings.RadCacheToggle = evt.newValue; SetGlobalDefines(TargetDefine, evt.newValue);});
             }
          return CustToggle;
       }
@@ -1819,6 +1824,10 @@ Toolbar toolbar;
             // Toggle ReflectionMotionVectorToggle = new Toggle() {value = (definesList.Contains("TTReflectionMotionVectors")), text = "Accurate Mirror Motion Vectors(Experiemental)"};
             //    ReflectionMotionVectorToggle.tooltip = "A better way to calculate motion vectors for reflections in mirrors and such for ASVGF, requires \"RemoveRasterizationRequirement\"";
             // ReflectionMotionVectorToggle.RegisterValueChangedCallback(evt => {if(evt.newValue) {AddDefine("TTReflectionMotionVectors"); SetGlobalDefines("TTReflectionMotionVectors", true);} else {RemoveDefine("TTReflectionMotionVectors"); SetGlobalDefines("TTReflectionMotionVectors", false);}});
+
+            Toggle YanusModeToggle = new Toggle() {value = (definesList.Contains("TTYanusMode")), text = "Enable Settings used by Yanus"};
+               YanusModeToggle.tooltip = "Enabled settings used by Yanus";
+            YanusModeToggle.RegisterValueChangedCallback(evt => {if(evt.newValue) {AddDefine("TTYanusMode");} else {RemoveDefine("TTYanusMode");}});
 
             Toggle RasterizedDirectToggle = new Toggle() {value = (definesList.Contains("RasterizedDirect")), text = "Use Rasterized Lighting for Direct"};
                RasterizedDirectToggle.tooltip = "Removes the need for rasterized rendering(except when upscaling with TAAU), allowing you to turn it off in your camera for extra performance";
@@ -1907,6 +1916,7 @@ Toolbar toolbar;
             OIDNToggle.RegisterValueChangedCallback(evt => {if(evt.newValue) AddDefine("UseOIDN"); else RemoveDefine("UseOIDN");});
 
 
+
             Toggle RadCacheToggle = new Toggle() {value = (definesList.Contains("DisableRadianceCache")), text = "FULLY Disable Radiance Cache"};
                RadCacheToggle.tooltip = "Prevents use of the radcache entirely while this is enabled, as it frees up all resources/ram/vram the radiance cache uses";
             RadCacheToggle.RegisterValueChangedCallback(evt => {if(evt.newValue) {SetGlobalDefines("RadCache", false); AddDefine("DisableRadianceCache");} else {SetGlobalDefines("RadCache", true); RemoveDefine("DisableRadianceCache");}});
@@ -1924,6 +1934,7 @@ Toolbar toolbar;
                // CustomMotionVectorToggle.SetEnabled(false);
                // ReflectionMotionVectorToggle.SetEnabled(false);
                RasterizedDirectToggle.SetEnabled(false);
+               YanusModeToggle.SetEnabled(false);
                // BindlessToggle.SetEnabled(false);
                GaussianTreeToggle.SetEnabled(false);
                OIDNToggle.SetEnabled(false);
@@ -1946,6 +1957,7 @@ Toolbar toolbar;
                // ReflectionMotionVectorToggle.SetEnabled(true);
                RasterizedDirectToggle.SetEnabled(true);
                // BindlessToggle.SetEnabled(true);
+               YanusModeToggle.SetEnabled(true);
                GaussianTreeToggle.SetEnabled(true);
                OIDNToggle.SetEnabled(true);
                RadCacheToggle.SetEnabled(true);
@@ -2013,6 +2025,7 @@ Toolbar toolbar;
          #if TTAdvancedSettings
             NonPlayContainer.Add(RadCacheToggle);
          #endif
+
          // NonPlayContainer.Add(CustomMotionVectorToggle);
          // NonPlayContainer.Add(ReflectionMotionVectorToggle);
          #if TTAdvancedSettings
@@ -2029,12 +2042,19 @@ Toolbar toolbar;
          NonPlayContainer.Add(TriangleSplittingToggle);
          #if TTAdvancedSettings
             NonPlayContainer.Add(StrictMemoryReductionToggle);
-            NonPlayContainer.Add(MultiMapScreenshotToggle);
+            #if TTYanusMode
+               NonPlayContainer.Add(MultiMapScreenshotToggle);
+            #endif
          #endif
          NonPlayContainer.Add(PhotonMappingToggle);
          #if TTAdvancedSettings
             NonPlayContainer.Add(RemoveScriptsDuringSaveToggle);
-            NonPlayContainer.Add(TTIncrementRenderCounterToggle);
+            #if TTYanusMode
+               NonPlayContainer.Add(TTIncrementRenderCounterToggle);
+            #endif
+         #endif
+         #if TTAdvancedSettings
+            NonPlayContainer.Add(YanusModeToggle);
          #endif
          NonPlayContainer.Add(TTAdvancedSettingsToggle);
          NonPlayContainer.Add(new Label("-------------"));
@@ -2063,6 +2083,13 @@ Toolbar toolbar;
          #if TTAdvancedSettings
             PlayContainer.Add(CustomToggle("Use Light BVH", "LBVH", "Quick toggle to switch between the active light tree(Gaussian tree or light bvh), and simple RIS, like the default unity lights use"));
          #endif
+
+         #if TTAdvancedSettings
+            #if TTYanusMode
+               RayMaster.LocalTTSettings.RadCacheToggle = GetGlobalDefine("RadCache");
+            #endif
+         #endif
+
          PlayContainer.Add(CustomToggle("Quick RadCache Toggle", "RadCache", "Quick toggle for the radiance cache, does NOT affect memory used by the radiance cache, unlike the toggle above"));
          #if TTAdvancedSettings
             PlayContainer.Add(CustomToggle("Use Texture LOD", "UseTextureLOD", "DX12 Only - Uses a higher texture LOD for each bounce, which can help performance"));
@@ -2112,21 +2139,46 @@ Toolbar toolbar;
          Toggle DoSavingToggle = new Toggle() {value = DoSaving, text = "Enable RayTracingObject Saving"};
             DoSavingToggle.tooltip = "Allows saving any changes to your truetrace materials made during play mode";
          DoSavingToggle.RegisterValueChangedCallback(evt => {DoSaving = evt.newValue; RayTracingMaster.DoSaving = DoSaving;});
+         
          Toggle MatChangeResetsAccumToggle = new Toggle() {value = MatChangeResetsAccum, text = "Material Change Resets Accumulation"};
          MatChangeResetsAccumToggle.RegisterValueChangedCallback(evt => {MatChangeResetsAccum = evt.newValue; RayMaster.LocalTTSettings.MatChangeResetsAccum = MatChangeResetsAccum;});
+         
          VisualElement ScreenShotBox = new VisualElement();
          ScreenShotBox.style.flexDirection = FlexDirection.Row;
-         Label PathLabel = new Label() {text = "Screenshot Path: "};
-         PathLabel.style.color = Color.black;
-         if(System.IO.Directory.Exists(PlayerPrefs.GetString("ScreenShotPath"))) PathLabel.style.backgroundColor = Color.green;
-         else PathLabel.style.backgroundColor = Color.red;
-         TextField AbsolutePath = new TextField();
-         AbsolutePath.value = PlayerPrefs.GetString("ScreenShotPath");
-         AbsolutePath.RegisterValueChangedCallback(evt => {if(System.IO.Directory.Exists(evt.newValue)) {PathLabel.style.backgroundColor = Color.green;} else {PathLabel.style.backgroundColor = Color.red;} PlayerPrefs.SetString("ScreenShotPath", evt.newValue);});
-         ScreenShotBox.Add(PathLabel);
-         ScreenShotBox.Add(AbsolutePath);
+            Label PathLabel = new Label() {text = "Screenshot Path: "};
+            PathLabel.style.color = Color.black;
+            if(System.IO.Directory.Exists(PlayerPrefs.GetString("ScreenShotPath"))) PathLabel.style.backgroundColor = Color.green;
+            else PathLabel.style.backgroundColor = Color.red;
+            TextField AbsolutePath = new TextField();
+            AbsolutePath.value = PlayerPrefs.GetString("ScreenShotPath");
+            AbsolutePath.RegisterValueChangedCallback(evt => {if(System.IO.Directory.Exists(evt.newValue)) {PathLabel.style.backgroundColor = Color.green;} else {PathLabel.style.backgroundColor = Color.red;} PlayerPrefs.SetString("ScreenShotPath", evt.newValue);});
+            ScreenShotBox.Add(PathLabel);
+            ScreenShotBox.Add(AbsolutePath);
+   #if TTAdvancedSettings
+      #if TTYanusMode
+         VisualElement PresetBox = new VisualElement();
+            ObjectField PanoPresetField = new ObjectField();
+            PanoPresetField.objectType = typeof(TTSettings);
+            PanoPresetField.label = "Panorama Preset";
+            PanoPresetField.value = PanoPreset;
+            PanoPresetField.RegisterValueChangedCallback(evt => {PanoPreset = (TTSettings)evt.newValue;});
 
+            ObjectField AnimationPresetField = new ObjectField();
+            AnimationPresetField.objectType = typeof(TTSettings);
+            AnimationPresetField.label = "Animation Preset";
+            AnimationPresetField.value = AnimationPreset;
+            AnimationPresetField.RegisterValueChangedCallback(evt => {AnimationPreset = (TTSettings)evt.newValue;});
 
+            ObjectField PresentationPresetField = new ObjectField();
+            PresentationPresetField.objectType = typeof(TTSettings);
+            PresentationPresetField.label = "Presentation Preset";
+            PresentationPresetField.value = PresentationPreset;
+            PresentationPresetField.RegisterValueChangedCallback(evt => {PresentationPreset = (TTSettings)evt.newValue;});
+         PresetBox.Add(PanoPresetField);
+         PresetBox.Add(AnimationPresetField);
+         PresetBox.Add(PresentationPresetField);
+      #endif
+   #endif
          VisualElement PanoramaBox = new VisualElement();
          PanoramaBox.style.flexDirection = FlexDirection.Row;
          Label PanoramaLabel = new Label() {text = "Panorama Path: "};
@@ -2220,6 +2272,11 @@ Toolbar toolbar;
          HardSettingsMenu.Add(TurnTableBox);
          HardSettingsMenu.Add(TimelineBox);
          HardSettingsMenu.Add(CounterBox);
+      #if TTAdvancedSettings
+         #if TTYanusMode
+            HardSettingsMenu.Add(PresetBox);
+         #endif
+      #endif
          // HardSettingsMenu.Add(CorrectMatOptionsButton);
          HardSettingsMenu.Add(RemoveTrueTraceButton);
          
@@ -2922,6 +2979,7 @@ Slider AperatureSlider;
            FireflyFrameCount = RayMaster.LocalTTSettings.FireflyFrameCount;
            FireflyFrameInterval = RayMaster.LocalTTSettings.FireflyFrameInterval;
            OIDNFrameCount = RayMaster.LocalTTSettings.OIDNFrameCount;
+           OIDNBlendRatio = RayMaster.LocalTTSettings.OIDNBlendRatio;
            RayMaster.IsFocusing = false;
            ConvBloom = RayMaster.LocalTTSettings.ConvBloom;
            ConvStrength = RayMaster.LocalTTSettings.ConvStrength;
@@ -3293,6 +3351,23 @@ Slider AperatureSlider;
                EnclosingBox.Add(RemainingObjectsLabel);
                EnclosingBox.Add(RemainingObjectsField);
                EnclosingBox.Add(ReadyBox);
+  
+            #if TTAdvancedSettings
+               #if TTYanusMode
+                  Button SetPresetPano = new Button(() => {RayMaster.LocalTTSettings = PanoPreset; SetGlobalDefines("RadCache", PanoPreset.RadCacheToggle); MainSource.Clear(); CreateGUI();});
+                     SetPresetPano.text = "Panorama Preset";
+                  Button SetPresetAnimation = new Button(() => {RayMaster.LocalTTSettings = AnimationPreset; SetGlobalDefines("RadCache", AnimationPreset.RadCacheToggle); MainSource.Clear(); CreateGUI();});
+                     SetPresetAnimation.text = "Animation Preset";
+                  Button SetPresetPresentation = new Button(() => {RayMaster.LocalTTSettings = PresentationPreset; SetGlobalDefines("RadCache", PresentationPreset.RadCacheToggle); MainSource.Clear(); CreateGUI();});
+                     SetPresetPresentation.text = "Presentation Preset";
+                  Button SetPresetDefault = new Button(() => {RayMaster.LoadTT(); SetGlobalDefines("RadCache", RayMaster.LocalTTSettings); MainSource.Clear(); CreateGUI();});
+                     SetPresetDefault.text = "Default Preset";
+                  EnclosingBox.Add(SetPresetPano);
+                  EnclosingBox.Add(SetPresetAnimation);
+                  EnclosingBox.Add(SetPresetPresentation);
+                  EnclosingBox.Add(SetPresetDefault);
+               #endif
+            #endif
             MainSource.Add(EnclosingBox);
 
         }

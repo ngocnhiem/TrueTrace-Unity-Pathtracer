@@ -423,7 +423,7 @@ inline void calcFinalColor(SmallerRay ray, inout ColData Color, MaterialData TTM
     [branch] if (CurBounce == 0 || GetBounceData(asuint(PSRScreenData.w)) == 0) {//Setting textures for denosier to use
         float3 Col = TTMat.surfaceColor;
         if(MaterialLobe == 3) Col = bsdf;
-        PSRScreenData = float4(asfloat(octahedral_32(((TTMat.diffTrans != 0 || CurBounce == 0) && Refracted) ? -norm : norm)), asfloat(packRGBE((CurBounce == 0) ? Col : (unpackRGBE(asuint(PSRScreenData.y)) * Col))), PSRScreenData.z + hit.t, asfloat((((asuint(PSRScreenData.w) & ~(0x7C000000)) & ~(0x400000)) | (((CurBounce < 20 && ((MaterialLobe == 3 && TTMat.roughness < 0.25f) || (TTMat.metallic == 1 && MaterialLobe == 0 && TTMat.roughness < 0.03f && CurBounce == 0))) ? 0 : (CurBounce + 2)) << 26)) | (Refracted << 22))); 
+        PSRScreenData = float4(asfloat(octahedral_32(((TTMat.diffTrans != 0 || CurBounce == 0) && Refracted) ? -norm : norm)), asfloat(packRGBE((CurBounce == 0) ? Col : (unpackRGBE(asuint(PSRScreenData.y)) * Col))), PSRScreenData.z + hit.t, asfloat((((asuint(PSRScreenData.w) & ~(0x7C000000)) & ~(0x400000)) | (((CurBounce < 20 && ((MaterialLobe == 3 && TTMat.roughness < 0.25f) || (TTMat.metallic == 1 && MaterialLobe == 0 && TTMat.roughness < 0.2f && CurBounce == 0))) ? 0 : (CurBounce + 2)) << 26)) | (Refracted << 22))); 
     }
 
     ray.origin = USGNorm * NormalOffset + pos;//Offset the ray origin so we dont self intersect with the triangle we just bounced off of
@@ -1392,6 +1392,7 @@ void TransferKernel(uint3 id : SV_DispatchThreadID) {
 RWStructuredBuffer<float3> OutputBuffer;
 RWStructuredBuffer<float3> AlbedoBuffer;
 RWStructuredBuffer<float3> NormalBuffer;
+RWStructuredBuffer<float2> MVBuffer;
 
 #pragma kernel OIDNtoTTKernel
 [numthreads(16, 16, 1)]
@@ -1399,7 +1400,7 @@ void OIDNtoTTKernel(uint3 id : SV_DispatchThreadID) {
     if(id.x >= screen_width || id.y >= screen_height) return;
     Result[id.xy] = float4(lerp(OutputBuffer[id.x + id.y * screen_width], Result[id.xy].xyz, 1.0f - OIDNBlendRatio), 1);
 }
-
+Texture2D<float2> TTMotionVectorTexture;
 
 #pragma kernel TTtoOIDNKernel
 [numthreads(16, 16, 1)]
@@ -1408,7 +1409,12 @@ void TTtoOIDNKernel(uint3 id : SV_DispatchThreadID) {
     int pixel_index = id.x + id.y * screen_width;
     if(OIDNGuideWrite) {
         NormalBuffer[pixel_index] = i_octahedral_32(ScreenSpaceInfo[id.xy].y);
-        AlbedoBuffer[pixel_index] = unpackRGBE(GlobalColors[pixel_index].Flags);
+        // AlbedoBuffer[pixel_index] = unpackRGBE(GlobalColors[pixel_index].Flags);
+        AlbedoBuffer[pixel_index] = unpackRGBE(asuint(PSRGBuff[id.xy].y));
+        // float2 ObjectOffsets = TTMotionVectorTexture[id.xy] * float2(screen_width, screen_height);
+        // if(ceil(id.x + ObjectOffsets.x) >= screen_width || id.x + ObjectOffsets.x < 0) ObjectOffsets.x = 0;
+        // if(ceil(id.y + ObjectOffsets.y) >= screen_height || id.y + ObjectOffsets.y < 0) ObjectOffsets.y = 0;
+        // MVBuffer[pixel_index] = clamp(ObjectOffsets, -float2(screen_width, screen_height), float2(screen_width, screen_height));// float2(0,0);//float3(-256.0f * TTMotionVectorTexture[id.xy],0.00f);
     }
     OutputBuffer[id.x + id.y * screen_width] = Result[id.xy].xyz;
 }

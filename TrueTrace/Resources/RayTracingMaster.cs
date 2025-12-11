@@ -134,6 +134,7 @@ namespace TrueTrace {
             private GraphicsBuffer OutputBuffer;
             private GraphicsBuffer AlbedoBuffer;
             private GraphicsBuffer NormalBuffer;
+            // private GraphicsBuffer MVBuffer;
         #endif
         #if !DisableRadianceCache
             private ComputeBuffer CacheBuffer;
@@ -465,6 +466,7 @@ namespace TrueTrace {
                 OutputBuffer.ReleaseSafe();
                 AlbedoBuffer.ReleaseSafe();
                 NormalBuffer.ReleaseSafe();
+                // MVBuffer.ReleaseSafe();
                 if(OIDNDenoiser != null) {
                     OIDNDenoiser.Dispose();
                     OIDNDenoiser = null;
@@ -911,6 +913,7 @@ namespace TrueTrace {
             ShadingShader.SetComputeBuffer(ShadeKernel, "GlobalRays", _RayBuffer);
             ShadingShader.SetComputeBuffer(ShadeKernel, "ShadowRaysBuffer", _ShadowBuffer);
             ShadingShader.SetTexture(ShadeKernel, "PSRGBuff", PSRGBuff);
+            ShadingShader.SetTexture(TTtoOIDNKernel, "PSRGBuff", PSRGBuff);
 
 #if MultiMapScreenshot
             ShadingShader.SetTexture(ShadeKernel, "MultiMapMatIDTexture", MultiMapMatIDTextureInitial);
@@ -929,6 +932,7 @@ namespace TrueTrace {
             #if UseOIDN
                 ShadingShader.SetBuffer(TTtoOIDNKernel, "AlbedoBuffer", AlbedoBuffer);
                 ShadingShader.SetBuffer(TTtoOIDNKernel, "NormalBuffer", NormalBuffer);
+                // ShadingShader.SetBuffer(TTtoOIDNKernel, "MVBuffer", MVBuffer);
                 ShadingShader.SetTexture(TTtoOIDNKernel, "ScreenSpaceInfo", ScreenSpaceInfo);
                 ShadingShader.SetComputeBuffer(TTtoOIDNKernel, "GlobalColors", LightingBuffer);
             #endif
@@ -1080,6 +1084,7 @@ namespace TrueTrace {
                         OutputBuffer.ReleaseSafe();
                         AlbedoBuffer.ReleaseSafe();
                         NormalBuffer.ReleaseSafe();
+                        // MVBuffer.ReleaseSafe();
                         if(OIDNDenoiser != null) {
                             OIDNDenoiser.Dispose();
                             OIDNDenoiser = null;
@@ -1116,6 +1121,7 @@ namespace TrueTrace {
                     OutputBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, SourceWidth * SourceHeight, 12);
                     AlbedoBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, SourceWidth * SourceHeight, 12);
                     NormalBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, SourceWidth * SourceHeight, 12);
+                    // MVBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, SourceWidth * SourceHeight, 8);
                 #endif
 #if EnablePhotonMapping
                 CommonFunctions.CreateRenderTexture(ref FirstDiffuseThroughputTex, SourceWidth, SourceHeight, CommonFunctions.RTFull4);

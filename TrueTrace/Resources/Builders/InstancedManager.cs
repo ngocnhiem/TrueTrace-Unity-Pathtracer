@@ -74,13 +74,17 @@ namespace TrueTrace {
             }
 
         }
-        public bool DoRendering = true;
+        public bool DoRendering = false;
         public void Update() {
             RenderInstances();
         }
 
         public void RenderInstances() {
+#if UNITY_EDITOR
+            if(!Application.isPlaying || DoRendering) {
+#else
             if(DoRendering) {
+#endif
                 if(InstanceIndexes == null || TempQue == null || NeedsToReinit) InitRelationships();
                 int Coun1 = TempQue.Count;
                 for(int i = 0; i < Coun1; i++) {

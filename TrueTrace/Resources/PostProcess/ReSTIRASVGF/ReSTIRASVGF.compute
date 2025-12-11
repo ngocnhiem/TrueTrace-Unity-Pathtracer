@@ -71,8 +71,6 @@ RWTexture2D<half4> TEX_PT_COLOR_HFWrite;
 Texture2D<half4> TEX_PT_COLOR_HF;
 RWTexture2D<uint> TEX_PT_COLOR_SPECWrite;
 Texture2D<uint> TEX_PT_COLOR_SPEC;
-RWTexture2D<half2> IMG_ASVGF_GRAD_HF_SPEC_PING;
-RWTexture2D<half2> IMG_ASVGF_GRAD_HF_SPEC_PONG;
 Texture2D<half> TEX_PT_VIEW_DEPTH_A;//current frame depth
 Texture2D<half> TEX_PT_VIEW_DEPTH_B;//previous frame depth
 
@@ -263,140 +261,9 @@ float CameraDist;
 float3 Forward;
 
 
-#pragma kernel Gradient_Img
-
-
-inline float get_gradient(float l_curr, float l_prev)
-{
-    float l_max = max(l_curr, l_prev);
-
-    if (l_max == 0)
-        return 0;
-
-    float ret = abs(l_curr - l_prev) / l_max;
-    // ret = min(ret, 0.4f);
-    ret *= ret; // make small changes less significant
-
-    return ret;
-}
-
-inline float2 get_lf_gradient(int2 ipos)
-{
-    // Find the same surface on the pvreious frame
-    float2 motion = -TEX_PT_MOTION.SampleLevel(my_linear_clamp_sampler, ipos / float2(screen_width, screen_height), 0).xy;
-
-    int2 pos_prev = int2(floor(((float2(ipos)+0.5) * float2((rcp(screen_width)), rcp(screen_height)) + motion.xy) * float2(screen_width, screen_height)));
-
-    // Ignore if the surface was outside of the screen
-    if (pos_prev.x < 0 || pos_prev.x >= screen_width || pos_prev.y < 0 || pos_prev.y >= screen_height)
-        return 0;
-
-    // Get the current path tracer output and the temporally accumulated history.
-    // Ignore disocclusion, doesn't seem to be necessary here as there is a huge blur pass
-    // done on the LF gradient samples after.
-    return 0;
-    // float lum_curr = TEX_PT_COLOR_LF_SH[ipos].w;
-    // float lum_prev = TEX_ASVGF_HIST_COLOR_LF_SH_B[pos_prev].w;
-
-    // // Return raw colors, do not divide until after the blur pass. We want to detect 
-    // // brightness changes over large parts of the screen to avoid noise.
-    // return float2(lum_curr, lum_prev);
-}
-[numthreads(16, 16, 1)]
-void Gradient_Img(uint3 gl_GlobalInvocationID : SV_DispatchThreadID)
-{
-    int2 ipos = gl_GlobalInvocationID.xy;
-    if (any((ipos >= int2(screen_width, screen_height) / GRAD_DWN)))
-        return;
-
-    float2 grad_lf = 0;
-
-    // Process all LF samples in the 3x3 square, accumulate the luminances
-
-    for (int yy = 0; yy < GRAD_DWN; yy++)
-    {
-        for (int xx = 0; xx < GRAD_DWN; xx++)
-        {
-            grad_lf += get_lf_gradient(ipos * GRAD_DWN + int2(xx, yy));
-        }
-    }
-
-    // IMG_ASVGF_GRAD_LF_PING[ipos] = grad_lf;
-}
 
 
 
-
-Texture2D<half2> TEX_ASVGF_GRAD_HF_SPEC_PING;
-Texture2D<half2> TEX_ASVGF_GRAD_HF_SPEC_PONG;
-
-
-#pragma kernel Gradient_Atrous
-
-int iteration;
-
-inline float2 filter_image(Texture2D<half2> img, int2 ipos)
-{
-    int2 grad_size = int2(screen_width, screen_height) / GRAD_DWN;
-
-    float2 color_center = img[ipos].xy;
-
-    float sum_w = 1;
-
-    const int step_size = int(1u << iteration);
-
-    float2 sum_color = 0;
-    sum_w = 0;
-    ipos += (random(64, ipos) - 0.5f);
-
-    const int r = 1;
-    for (int yy = -r; yy <= r; yy++) {
-        for (int xx = -r; xx <= r; xx++) {
-            int2 p = ipos + int2(xx, yy) * step_size;
-
-            float2  c = img[p].xy;
-
-            if (any((p >= grad_size) || p < 0))
-                c = 0;
-
-            float w = wavelet_kernel[abs(xx)][abs(yy)];// / (float)step_size;
-
-            sum_color += c * w;
-            sum_w += w;
-        }
-    }
-    sum_color /= sum_w;
-
-
-    return sum_color;
-}
-
-[numthreads(16, 16, 1)]
-void Gradient_Atrous(uint3 id : SV_DispatchThreadID)
-{
-
-    int2 ipos = id.xy;
-    int2 grad_size = int2(screen_width, screen_height) / GRAD_DWN;
-    if (any((ipos >= grad_size) || ipos < 0))
-        return;
-
-    float2 filtered_lf = 0;
-    float2 filtered_hf_spec = 0;
-    [branch] switch (iteration) {
-    case 0: filtered_hf_spec = filter_image(TEX_ASVGF_GRAD_HF_SPEC_PING, id.xy); break;
-    case 1: filtered_hf_spec = filter_image(TEX_ASVGF_GRAD_HF_SPEC_PONG, id.xy); break;
-    case 2: filtered_hf_spec = filter_image(TEX_ASVGF_GRAD_HF_SPEC_PING, id.xy); break;
-    case 6:
-        break;
-    }
-
-    [branch] switch (iteration) {
-    case 0: IMG_ASVGF_GRAD_HF_SPEC_PONG[ipos] = filtered_hf_spec; break;
-    case 1: IMG_ASVGF_GRAD_HF_SPEC_PING[ipos] = filtered_hf_spec; break;
-    case 2: IMG_ASVGF_GRAD_HF_SPEC_PONG[ipos] = filtered_hf_spec; break;
-    }
-
-}
 
 
 #define GROUP_SIZE 15
@@ -461,7 +328,7 @@ Texture2D<float4> quart_read;
 Texture2D<float4> quart_read2;
 
 
-bool reprojection_intersect_border(inout float2 prev_pos, const float2 mv, const float2 image_size_minus_one) {
+inline bool reprojection_intersect_border(inout float2 prev_pos, const float2 mv, const float2 image_size_minus_one) {
     if (any(round(prev_pos) > image_size_minus_one) || any(round(prev_pos) < 0)) {
         // Intersect motion vector with image:
         const float tmin = max(min(prev_pos.x / mv.x, (prev_pos.x - image_size_minus_one.x) / mv.x),
@@ -490,6 +357,7 @@ void Temporal(uint3 gl_GlobalInvocationID : SV_DispatchThreadID, uint3 gl_WorkGr
     Lowered = reprojection_intersect_border(pos_prev, motion, int2(screen_width, screen_height) - 1);
 
 
+    bool ReflectedRefracted = ReflRefracA[gl_GlobalInvocationID.xy] >> 31;
     // Load the parameters of the target pixel
     float depth_curr;
     float3 normal_curr;
@@ -503,11 +371,10 @@ void Temporal(uint3 gl_GlobalInvocationID : SV_DispatchThreadID, uint3 gl_WorkGr
     float motion_length = length((motion.xy + reflprojection) * float2(screen_width, screen_height));
     // float motion_length = length((motion.xy) * float2(screen_width, screen_height));
     
-    float4 percentiles;
 
     const uint2 rounded_size = uint2(screen_width, screen_height);
-    percentiles = quart_read.SampleLevel(my_linear_clamp_sampler, ((float2)(ipos.xy) + 0.5) / (float2)rounded_size,0);
-    float4 percentiles2 = quart_read2.SampleLevel(my_linear_clamp_sampler, ((float2)(ipos.xy) + 0.5) / (float2)rounded_size,0);
+    const float4 percentiles = quart_read.SampleLevel(my_linear_clamp_sampler, ((float2)(ipos.xy) + 0.5) / (float2)rounded_size,0);
+    const float4 percentiles2 = quart_read2.SampleLevel(my_linear_clamp_sampler, ((float2)(ipos.xy) + 0.5) / (float2)rounded_size,0);
 
     // float CenterFDepth = TEX_PT_VIEW_DEPTH_A[ipos].y;
 
@@ -515,7 +382,6 @@ void Temporal(uint3 gl_GlobalInvocationID : SV_DispatchThreadID, uint3 gl_WorkGr
 
     float3 geo_normal_curr = i_octahedral_32(TEX_PT_NORMALS_A[ipos].x);
 
-    bool ReflectedRefracted = ReflRefracA[gl_GlobalInvocationID.xy] >> 31;
 
     uint MatIndex = (ReflRefracA[gl_GlobalInvocationID.xy] << 4) >> 4;
 
@@ -543,7 +409,9 @@ void Temporal(uint3 gl_GlobalInvocationID : SV_DispatchThreadID, uint3 gl_WorkGr
         [unroll]for (int i = 0; i < 4; i++) {
             int2 p = int2(pos_ld)+off[i];
 
-            if (p.x < 0 || p.x >= screen_width || p.y >= screen_height)
+            Lowered = Lowered || reprojection_intersect_border(p, motion, int2(screen_width, screen_height) - 1);
+
+            if (p.x < 0 || p.y < 0 || p.x >= screen_width || p.y >= screen_height)
                 continue;
 
             float depth_prev = TEX_PT_VIEW_DEPTH_B[p].x;
@@ -560,17 +428,19 @@ void Temporal(uint3 gl_GlobalInvocationID : SV_DispatchThreadID, uint3 gl_WorkGr
             [branch]if(!ReflectedRefracted && !ReflectedRefractedPrev) {
                 if (dist_depth < 0.1)
                 {
-                    float w_diff = w[i] * max(dot_normals, 0);
-                    float w_spec = w[i] * pow(max(dot_normals, 0), shininess);
+                    if(dot_geo_normals > 0.9f) {
+                        float w_diff = w[i] * max(dot_normals, 0);
+                        float w_spec = w[i] * pow(max(dot_normals, 0), shininess);
 
-    
+        
 
-                    temporal_color_hf += TEX_ASVGF_HIST_COLOR_HF[p] * w_diff;
-                    temporal_color_histlen_spec += float4(unpackRGBE(asuint(TEX_ASVGF_FILTERED_SPEC_B[p].x)), TEX_ASVGF_FILTERED_SPEC_B[p].y) * w_spec;
-                    float4 A = TEX_ASVGF_HIST_MOMENTS_HF_B[p].rgba;
-                    temporal_moments_histlen_hf += A * w_diff;
-                    temporal_sum_w_diff += w_diff;
-                    temporal_sum_w_spec += w_spec;
+                        temporal_color_hf += TEX_ASVGF_HIST_COLOR_HF[p] * w_diff;
+                        temporal_color_histlen_spec += float4(unpackRGBE(asuint(TEX_ASVGF_FILTERED_SPEC_B[p].x)), TEX_ASVGF_FILTERED_SPEC_B[p].y) * w_spec;
+                        float4 A = TEX_ASVGF_HIST_MOMENTS_HF_B[p].rgba;
+                        temporal_moments_histlen_hf += A * w_diff;
+                        temporal_sum_w_diff += w_diff;
+                        temporal_sum_w_spec += w_spec;
+                    }
                 }
             } else {
                 if (dist_depth < 0.1)
@@ -616,12 +486,13 @@ void Temporal(uint3 gl_GlobalInvocationID : SV_DispatchThreadID, uint3 gl_WorkGr
 
     {
         float spatial_sum_w_hf = 1.0;
-        for (int yy = -1; yy <= 1; yy++) {
-            for (int xx = -1; xx <= 1; xx++) {
+        [unroll]for (int yy = -1; yy <= 1; yy++) {
+            [unroll]for (int xx = -1; xx <= 1; xx++) {
                 if (xx == 0 && yy == 0)
                     continue;
 
                 int2 p = ipos + int2(xx, yy);
+                if(any(p < 0 || p >= int2(screen_width, screen_height))) continue;
 
                 float depth;
                 float3 normal;
@@ -648,25 +519,39 @@ void Temporal(uint3 gl_GlobalInvocationID : SV_DispatchThreadID, uint3 gl_WorkGr
 
     {
         float spatial_sum_w_spec = 1.0;
-        for (int yy = -4; yy <= 4; yy++) {
-            for (int xx = -4; xx <= 4; xx++) {
+       [unroll] for (int yy = -4; yy <= 4; yy++) {
+            [unroll]for (int xx = -4; xx <= 4; xx++) {
                 if (xx == 0 && yy == 0)
                     continue;
 
                 int2 p = ipos + int2(xx, yy);
+                if(any(p < 0 || p >= int2(screen_width, screen_height))) continue;
 
                 float depth;
                 float3 normal;
                 float lum_p_hf;
-                // get_shared_data(int2(xx, yy), depth, normal, lum_p_hf, gl_LocalInvocationID);
-                // lum_p_hf += luminance(unpackRGBE(TEX_PT_COLOR_SPEC[p].x));
-                float dist_z = abs(depth_curr - TEX_PT_VIEW_DEPTH_A[p].x) / abs(depth_curr);// * CenterFDepth;// * FDepth[ipos] * 120.0f;
-                if (dist_z < 2.0) {
-                    float w_hf = clamp(pow(max(0.0, dot( i_octahedral_32(TEX_PT_NORMALS_A[p].y), normal_curr)), 128.0),0,1);
+                [branch]if(abs(xx) <= 1 && abs(yy) <= 1) {
+                    get_shared_data(int2(xx, yy), depth, normal, lum_p_hf, gl_LocalInvocationID);
+                    float dist_z = abs(depth_curr - depth) / abs(depth_curr);// * CenterFDepth;// * FDepth[ipos] * 120.0f;
+                    if (dist_z < 2.0) {
+                        float w_hf = clamp(pow(max(0.0, dot( normal, normal_curr)), 128.0),0,1);
 
-                    float lum_p_spec = luminance(unpackRGBE(TEX_PT_COLOR_SPEC[p].x));
-                    spatial_moments_spec += float2(lum_p_spec * w_hf, lum_p_spec * lum_p_spec * w_hf);
-                    spatial_sum_w_spec += w_hf;
+                        float lum_p_spec = luminance(unpackRGBE(TEX_PT_COLOR_SPEC[p].x));
+                        spatial_moments_spec += float2(lum_p_spec * w_hf, lum_p_spec * lum_p_spec * w_hf);
+                        spatial_sum_w_spec += w_hf;
+                    }
+                } else {
+                    // get_shared_data(int2(xx, yy), depth, normal, lum_p_hf, gl_LocalInvocationID);
+                    // lum_p_hf += luminance(unpackRGBE(TEX_PT_COLOR_SPEC[p].x));
+                    float dist_z = abs(depth_curr - TEX_PT_VIEW_DEPTH_A[p].x) / abs(depth_curr);// * CenterFDepth;// * FDepth[ipos] * 120.0f;
+                    if (dist_z < 2.0) {
+                        float w_hf = clamp(pow(max(0.0, dot( i_octahedral_32(TEX_PT_NORMALS_A[p].y), normal_curr)), 128.0),0,1);
+
+                        float lum_p_spec = luminance(unpackRGBE(TEX_PT_COLOR_SPEC[p].x));
+                        spatial_moments_spec += float2(lum_p_spec * w_hf, lum_p_spec * lum_p_spec * w_hf);
+                        spatial_sum_w_spec += w_hf;
+                    }
+
                 }
             }
         }
@@ -926,12 +811,8 @@ inline void filter_image(
             int2 p = ipos + int2(xx, yy) * step_size;// + jitter;
             int actxx = xx;
             int actyy = yy;
-            if(p.x <= 0 || p.x > screen_width) {
-                actxx *= -1;
-            }
-            if(p.y <= 0 || p.y > screen_height) {
-                actyy *= -1;
-            }
+            if(p.x <= 0 || p.x > screen_width) actxx *= -1;
+            if(p.y <= 0 || p.y > screen_height) actyy *= -1;
             p = ipos + int2(actxx, actyy) * step_size;// + jitter;
 
             float w = float(all((p >= 0))
@@ -1056,32 +937,6 @@ void Atrous(uint3 gl_GlobalInvocationID : SV_DispatchThreadID, uint3 gl_WorkGrou
     }
 } 
 
-float NearPlane;
-#pragma kernel DistanceCorrectionKernel
-float FetchDepth(float2 UV) {
-    Ray ray = CreateCameraRay(UV * 2.0f - 1.0f);  
-    #ifdef HDRP
-        float depth = 1.0f - (Depth[int3(UV * float2(screen_width, screen_height),0)].x);
-    #else
-        float depth = 1.0f - (Depth.SampleLevel(my_linear_clamp_sampler, UV, 0).x);
-    #endif
-        depth = NearPlane * FarPlane / (depth * (NearPlane - FarPlane) + FarPlane);
-        return length(ray.direction / dot(ray.direction, Forward) * depth);   
-}
-
-RWTexture2D<half2> TEX_PT_VIEW_DEPTH_AWRITE;//current frame depth
-[numthreads(32, 32, 1)]
-void DistanceCorrectionKernel(uint3 id : SV_DispatchThreadID) {
-    if(id.x >= (uint)screen_width || id.y >= (uint)screen_height) return;
-    float2 Uv = (id.xy + 0.5f) / float2(screen_width, screen_height);
-
-    float CurDepth = FetchDepth(Uv);
-    float CurDepthX = FetchDepth(Uv + float2(rcp(screen_width) * 2.0f, 0));
-    float CurDepthY = FetchDepth(Uv + float2(0, rcp(screen_height) * 2.0f));
-    float CurDepthX2 = FetchDepth(Uv - float2(rcp(screen_width) * 2.0f, 0));
-    float CurDepthY2 = FetchDepth(Uv - float2(0, rcp(screen_height) * 2.0f));
-    TEX_PT_VIEW_DEPTH_AWRITE[id.xy] = CurDepth;//, abs(CurDepth - CurDepthX) + abs(CurDepth - CurDepthY) + abs(CurDepth - CurDepthY2) + abs(CurDepth - CurDepthX2));
-}
 
 #pragma kernel TempCopyKernel
 

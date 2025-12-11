@@ -30,7 +30,7 @@
 #define ReSTIRReflectionRefinement
 // #define ShadowGlassAttenuation
 // #define DisableNormalMaps
-#define ClayMetalOverride
+// #define ClayMetalOverride
 // #define IgnoreBackfacingEmissive
 // #define AltFadeMapping
 // #define MoreAO
