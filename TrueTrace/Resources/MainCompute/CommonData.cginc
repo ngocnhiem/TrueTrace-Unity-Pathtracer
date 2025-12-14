@@ -772,6 +772,7 @@ inline uint cwbvh_node_intersect(const SmallerRay ray, int oct_inv4, float max_d
     uint y_max = TempNode.nodes[3].y;
     uint z_min = TempNode.nodes[4].x;
     uint z_max = TempNode.nodes[4].y;
+    uint meta4 = TempNode.nodes[1].z;
     //XOR swaps
     [branch]if(RayDirBools.x) {x_min ^= x_max; x_max ^= x_min; x_min ^= x_max;}
     [branch]if(RayDirBools.y) {y_min ^= y_max; y_max ^= y_min; y_min ^= y_max;}
@@ -779,11 +780,8 @@ inline uint cwbvh_node_intersect(const SmallerRay ray, int oct_inv4, float max_d
 
     [unroll]
     for(int i = 0; i < 2; i++) {
-        uint meta4 = (i == 0 ? TempNode.nodes[1].z : TempNode.nodes[1].w);
 
-        uint is_inner4   = (meta4 & (meta4 << 1)) & 0x10101010;
-        uint inner_mask4 = (is_inner4 >> 4) * 0xffu;
-        uint bit_index4  = (meta4 ^ (oct_inv4 & inner_mask4)) & 0x1f1f1f1f;
+        uint bit_index4  = (meta4 ^ (oct_inv4 & ((((meta4 & (meta4 << 1)) & 0x10101010) >> 4) * 0xffu))) & 0x1f1f1f1f;
         uint child_bits4 = (meta4 >> 5) & 0x07070707;
 
         [unroll]
@@ -813,6 +811,7 @@ inline uint cwbvh_node_intersect(const SmallerRay ray, int oct_inv4, float max_d
 	        y_max = TempNode.nodes[3].w;
 	        z_min = TempNode.nodes[4].z;
 	        z_max = TempNode.nodes[4].w;
+    		meta4 = TempNode.nodes[1].w;
 		    //XOR swaps
 	        [branch]if(RayDirBools.x) {x_min ^= x_max; x_max ^= x_min; x_min ^= x_max;}
 	        [branch]if(RayDirBools.y) {y_min ^= y_max; y_max ^= y_min; y_min ^= y_max;}

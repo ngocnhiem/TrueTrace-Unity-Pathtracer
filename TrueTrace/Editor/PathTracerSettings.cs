@@ -2271,9 +2271,9 @@ Toolbar toolbar;
          HardSettingsMenu.Add(PanoramaBox);
          HardSettingsMenu.Add(TurnTableBox);
          HardSettingsMenu.Add(TimelineBox);
-         HardSettingsMenu.Add(CounterBox);
       #if TTAdvancedSettings
          #if TTYanusMode
+            HardSettingsMenu.Add(CounterBox);
             HardSettingsMenu.Add(PresetBox);
          #endif
       #endif
@@ -2941,6 +2941,7 @@ Slider AperatureSlider;
            DoF = RayMaster.LocalTTSettings.PPDoF;
            ClayMetalOverride = RayMaster.LocalTTSettings.ClayMetalOverride;
            ClayRoughnessOverride = RayMaster.LocalTTSettings.ClayRoughnessOverride;
+           MaxSampCount = RayMaster.LocalTTSettings.MaxSampCount;
            ClayColor = RayMaster.LocalTTSettings.ClayColor;
            GroundColor = RayMaster.LocalTTSettings.GroundColor;
            DoFAperature = RayMaster.LocalTTSettings.DoFAperature;
@@ -3354,11 +3355,86 @@ Slider AperatureSlider;
   
             #if TTAdvancedSettings
                #if TTYanusMode
-                  Button SetPresetPano = new Button(() => {RayMaster.LocalTTSettings = PanoPreset; SetGlobalDefines("RadCache", PanoPreset.RadCacheToggle); MainSource.Clear(); CreateGUI();});
+                  Button SetPresetPano = new Button(() => {
+                        RayMaster.LoadTT();
+                        TTSettings TTTempSettings = PanoPreset;
+                           TTTempSettings.BackgroundType = RayMaster.LocalTTSettings.BackgroundType;
+                           TTTempSettings.BackgroundIntensity = RayMaster.LocalTTSettings.BackgroundIntensity;
+                           TTTempSettings.SceneBackgroundColor = RayMaster.LocalTTSettings.SceneBackgroundColor;
+                           TTTempSettings.SecondaryBackgroundType = RayMaster.LocalTTSettings.SecondaryBackgroundType;
+                           TTTempSettings.SecondarySceneBackgroundColor = RayMaster.LocalTTSettings.SecondarySceneBackgroundColor;
+                           TTTempSettings.HDRILongLat = RayMaster.LocalTTSettings.HDRILongLat;
+                           TTTempSettings.HDRIScale = RayMaster.LocalTTSettings.HDRIScale;
+                           TTTempSettings.PrimaryBackgroundTintColor = RayMaster.LocalTTSettings.PrimaryBackgroundTintColor;
+                           TTTempSettings.PrimaryBackgroundTint = RayMaster.LocalTTSettings.PrimaryBackgroundTint;
+                           TTTempSettings.PrimaryBackgroundContrast = RayMaster.LocalTTSettings.PrimaryBackgroundContrast;
+                           TTTempSettings.PPExposure = RayMaster.LocalTTSettings.PPExposure;
+                           TTTempSettings.ExposureAuto = RayMaster.LocalTTSettings.ExposureAuto;
+                           TTTempSettings.PPToneMap = RayMaster.LocalTTSettings.PPToneMap;
+                           TTTempSettings.Exposure = RayMaster.LocalTTSettings.Exposure;
+                           TTTempSettings.ToneMapper = RayMaster.LocalTTSettings.ToneMapper;
+                           TTTempSettings.LEMEnergyScale = RayMaster.LocalTTSettings.LEMEnergyScale;
+                           TTTempSettings.LightEnergyScale = RayMaster.LocalTTSettings.LightEnergyScale;
+                           TTTempSettings.IndirectBoost = RayMaster.LocalTTSettings.IndirectBoost;
+                        RayMaster.LocalTTSettings = TTTempSettings; 
+                        SetGlobalDefines("RadCache", PanoPreset.RadCacheToggle); 
+                        MainSource.Clear(); 
+                        CreateGUI();
+                     });
                      SetPresetPano.text = "Panorama Preset";
-                  Button SetPresetAnimation = new Button(() => {RayMaster.LocalTTSettings = AnimationPreset; SetGlobalDefines("RadCache", AnimationPreset.RadCacheToggle); MainSource.Clear(); CreateGUI();});
+                  Button SetPresetAnimation = new Button(() => {
+                        RayMaster.LoadTT();
+                        TTSettings TTTempSettings = AnimationPreset;
+                           TTTempSettings.BackgroundType = RayMaster.LocalTTSettings.BackgroundType;
+                           TTTempSettings.BackgroundIntensity = RayMaster.LocalTTSettings.BackgroundIntensity;
+                           TTTempSettings.SceneBackgroundColor = RayMaster.LocalTTSettings.SceneBackgroundColor;
+                           TTTempSettings.SecondaryBackgroundType = RayMaster.LocalTTSettings.SecondaryBackgroundType;
+                           TTTempSettings.SecondarySceneBackgroundColor = RayMaster.LocalTTSettings.SecondarySceneBackgroundColor;
+                           TTTempSettings.HDRILongLat = RayMaster.LocalTTSettings.HDRILongLat;
+                           TTTempSettings.HDRIScale = RayMaster.LocalTTSettings.HDRIScale;
+                           TTTempSettings.PrimaryBackgroundTintColor = RayMaster.LocalTTSettings.PrimaryBackgroundTintColor;
+                           TTTempSettings.PrimaryBackgroundTint = RayMaster.LocalTTSettings.PrimaryBackgroundTint;
+                           TTTempSettings.PrimaryBackgroundContrast = RayMaster.LocalTTSettings.PrimaryBackgroundContrast;
+                           TTTempSettings.PPExposure = RayMaster.LocalTTSettings.PPExposure;
+                           TTTempSettings.ExposureAuto = RayMaster.LocalTTSettings.ExposureAuto;
+                           TTTempSettings.PPToneMap = RayMaster.LocalTTSettings.PPToneMap;
+                           TTTempSettings.Exposure = RayMaster.LocalTTSettings.Exposure;
+                           TTTempSettings.ToneMapper = RayMaster.LocalTTSettings.ToneMapper;
+                           TTTempSettings.LEMEnergyScale = RayMaster.LocalTTSettings.LEMEnergyScale;
+                           TTTempSettings.LightEnergyScale = RayMaster.LocalTTSettings.LightEnergyScale;
+                           TTTempSettings.IndirectBoost = RayMaster.LocalTTSettings.IndirectBoost;
+                        RayMaster.LocalTTSettings = TTTempSettings; 
+                        SetGlobalDefines("RadCache", AnimationPreset.RadCacheToggle); 
+                        MainSource.Clear(); 
+                        CreateGUI();
+                     });
                      SetPresetAnimation.text = "Animation Preset";
-                  Button SetPresetPresentation = new Button(() => {RayMaster.LocalTTSettings = PresentationPreset; SetGlobalDefines("RadCache", PresentationPreset.RadCacheToggle); MainSource.Clear(); CreateGUI();});
+                  Button SetPresetPresentation = new Button(() => {
+                        RayMaster.LoadTT();
+                        TTSettings TTTempSettings = PresentationPreset;
+                           TTTempSettings.BackgroundType = RayMaster.LocalTTSettings.BackgroundType;
+                           TTTempSettings.BackgroundIntensity = RayMaster.LocalTTSettings.BackgroundIntensity;
+                           TTTempSettings.SceneBackgroundColor = RayMaster.LocalTTSettings.SceneBackgroundColor;
+                           TTTempSettings.SecondaryBackgroundType = RayMaster.LocalTTSettings.SecondaryBackgroundType;
+                           TTTempSettings.SecondarySceneBackgroundColor = RayMaster.LocalTTSettings.SecondarySceneBackgroundColor;
+                           TTTempSettings.HDRILongLat = RayMaster.LocalTTSettings.HDRILongLat;
+                           TTTempSettings.HDRIScale = RayMaster.LocalTTSettings.HDRIScale;
+                           TTTempSettings.PrimaryBackgroundTintColor = RayMaster.LocalTTSettings.PrimaryBackgroundTintColor;
+                           TTTempSettings.PrimaryBackgroundTint = RayMaster.LocalTTSettings.PrimaryBackgroundTint;
+                           TTTempSettings.PrimaryBackgroundContrast = RayMaster.LocalTTSettings.PrimaryBackgroundContrast;
+                           TTTempSettings.PPExposure = RayMaster.LocalTTSettings.PPExposure;
+                           TTTempSettings.ExposureAuto = RayMaster.LocalTTSettings.ExposureAuto;
+                           TTTempSettings.PPToneMap = RayMaster.LocalTTSettings.PPToneMap;
+                           TTTempSettings.Exposure = RayMaster.LocalTTSettings.Exposure;
+                           TTTempSettings.ToneMapper = RayMaster.LocalTTSettings.ToneMapper;
+                           TTTempSettings.LEMEnergyScale = RayMaster.LocalTTSettings.LEMEnergyScale;
+                           TTTempSettings.LightEnergyScale = RayMaster.LocalTTSettings.LightEnergyScale;
+                           TTTempSettings.IndirectBoost = RayMaster.LocalTTSettings.IndirectBoost;
+                        RayMaster.LocalTTSettings = TTTempSettings;  
+                        SetGlobalDefines("RadCache", PresentationPreset.RadCacheToggle); 
+                        MainSource.Clear(); 
+                        CreateGUI();
+                     });
                      SetPresetPresentation.text = "Presentation Preset";
                   Button SetPresetDefault = new Button(() => {RayMaster.LoadTT(); SetGlobalDefines("RadCache", RayMaster.LocalTTSettings); MainSource.Clear(); CreateGUI();});
                      SetPresetDefault.text = "Default Preset";

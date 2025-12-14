@@ -1342,14 +1342,13 @@ namespace TrueTrace {
                 bool FlipFrame = (FramesSinceStart2 % 2 == 0);
 
                     if(DoKernelProfiling) cmd.BeginSample("ReSTIRGI Extra Spatial Kernel");
-                    SetInt("CurPass", 0, cmd);
 
+                    SetInt("CurBounce", 1, cmd);
                     cmd.DispatchCompute(ReSTIRGI, ReSTIRGISpatialKernel, Mathf.CeilToInt(SourceWidth / 8.0f), Mathf.CeilToInt(SourceHeight / 8.0f), 1);
                     if(DoKernelProfiling) cmd.EndSample("ReSTIRGI Extra Spatial Kernel");
 
                     if(DoKernelProfiling) cmd.BeginSample("ReSTIRGI Extra Spatial Kernel 1");
-                    SetInt("frames_accumulated", _currentSample * 2, cmd);
-                    SetInt("CurPass", 1, cmd);
+                    SetInt("CurBounce", 2, cmd);
                     cmd.DispatchCompute(ReSTIRGI, ReSTIRGISpatialKernel+1, Mathf.CeilToInt(SourceWidth / 8.0f), Mathf.CeilToInt(SourceHeight / 8.0f), 1);
                     if(DoKernelProfiling) cmd.EndSample("ReSTIRGI Extra Spatial Kernel 1");
 
