@@ -64,7 +64,7 @@ namespace TrueTrace {
         [HideInInspector] public List<MyMeshDataCompacted> MyMeshesCompacted;
         [HideInInspector] public List<LightData> UnityLights;
         [HideInInspector] public InstancedManager InstanceData;
-        [HideInInspector] public List<InstancedObject> Instances;
+        [HideInInspector] public HashedList<InstancedObject> Instances;
         [HideInInspector] public ComputeBuffer TLASCWBVHIndexes;
         [HideInInspector] private ComputeBuffer[] WorkingBuffer;
         [HideInInspector] private ComputeBuffer[] LBVHWorkingSet;
@@ -125,18 +125,18 @@ namespace TrueTrace {
 
 
         [HideInInspector] public List<Transform> RenderTransforms;
-        [HideInInspector] public List<ParentObject> RenderQue;
-        [HideInInspector] public List<ParentObject> BuildQue;
-        [HideInInspector] public List<ParentObject> AddQue;
-        [HideInInspector] public List<ParentObject> RemoveQue;
-        [HideInInspector] public List<ParentObject> UpdateQue;
+        [HideInInspector] public HashedList<ParentObject> RenderQue;
+        [HideInInspector] public HashedList<ParentObject> BuildQue;
+        [HideInInspector] public HashedList<ParentObject> AddQue;
+        [HideInInspector] public HashedList<ParentObject> RemoveQue;
+        [HideInInspector] public HashedList<ParentObject> UpdateQue;
 
-        [HideInInspector] public List<InstancedObject> InstanceRenderQue;
-        [HideInInspector] public List<InstancedObject> InstanceUpdateQue;
+        [HideInInspector] public HashedList<InstancedObject> InstanceRenderQue;
+        [HideInInspector] public HashedList<InstancedObject> InstanceUpdateQue;
+        [HideInInspector] public HashedList<InstancedObject> InstanceBuildQue;
+        [HideInInspector] public HashedList<InstancedObject> InstanceAddQue;
+        [HideInInspector] public HashedList<InstancedObject> InstanceRemoveQue;
         [HideInInspector] public List<Transform> InstanceRenderTransforms;
-        [HideInInspector] public List<InstancedObject> InstanceBuildQue;
-        [HideInInspector] public List<InstancedObject> InstanceAddQue;
-        [HideInInspector] public List<InstancedObject> InstanceRemoveQue;
 
         [HideInInspector] public List<Transform> LightTransforms;
 
@@ -560,12 +560,14 @@ namespace TrueTrace {
 
         private void CreateAtlas(int TotalMatCount, CommandBuffer cmd) {//Creates texture atlas
             TotalMatCount = 0;
-            foreach (ParentObject Obj in RenderQue) {
-                // MaterialsChanged.AddRange(Obj.ChildObjects);
-                TotalMatCount += Obj._Materials.Count;
+            ParentObject Obj;
+            int RendCount = RenderQue.Count;
+            for(int i19 = 0; i19 < RendCount; i19++) {
+                TotalMatCount += RenderQue[i19]._Materials.Count;
             }
-            foreach (ParentObject Obj in InstanceData.RenderQue) {
-                TotalMatCount += Obj._Materials.Count;
+            RendCount = InstanceData.RenderQue.Count;
+            for(int i19 = 0; i19 < RendCount; i19++) {
+                TotalMatCount += InstanceData.RenderQue[i19]._Materials.Count;
             }
             int TerrainCount = Terrains.Count;
              if (TerrainCount != 0) {
@@ -606,7 +608,9 @@ namespace TrueTrace {
 
             if(RenderQue.Count == 0) return;
 
-            foreach (ParentObject Obj in RenderQue) {
+            RendCount = RenderQue.Count;
+            for(int i19 = 0; i19 < RendCount; i19++) {
+                Obj = RenderQue[i19];
                 foreach (RayTracingObject Obj2 in Obj.ChildObjects) {
                     Obj2.MatOffset = MatCount;
                 }
@@ -645,7 +649,9 @@ namespace TrueTrace {
                     MatCount++;
                 }
             }
-            foreach (ParentObject Obj in InstanceData.RenderQue) {
+            RendCount = InstanceData.RenderQue.Count;
+            for(int i19 = 0; i19 < RendCount; i19++) {
+                Obj = InstanceData.RenderQue[i19];
                 foreach (RayTracingObject Obj2 in Obj.ChildObjects) {
                     Obj2.MatOffset = MatCount;
                 }
@@ -750,7 +756,7 @@ namespace TrueTrace {
             }
 
 
-            if (!RenderQue.Any())
+            if (RenderQue == null || RenderQue.Count == 0)
                 return;
 
             #if !DX11Only && !UseAtlas
@@ -951,23 +957,33 @@ namespace TrueTrace {
 
             MaterialsChanged = new List<RayTracingObject>();
             InstanceData = GameObject.Find("InstancedStorage").GetComponent<InstancedManager>();
-            Instances = new List<InstancedObject>();
+            Instances = new HashedList<InstancedObject>();
             SunDirection = new Vector3(0, -1, 0);
             {
-                AddQue = new List<ParentObject>();
-                RemoveQue = new List<ParentObject>();
-                RenderQue = new List<ParentObject>();
+                RenderQue?.Dispose();
+                UpdateQue?.Dispose();
+                BuildQue?.Dispose();
+                AddQue?.Dispose();
+                RemoveQue?.Dispose();
+                AddQue = new HashedList<ParentObject>();
+                RemoveQue = new HashedList<ParentObject>();
+                RenderQue = new HashedList<ParentObject>();
                 RenderTransforms = new List<Transform>();
-                UpdateQue = new List<ParentObject>();
-                BuildQue = new List<ParentObject>();
+                UpdateQue = new HashedList<ParentObject>();
+                BuildQue = new HashedList<ParentObject>();
             }
             {
-                InstanceRenderQue = new List<InstancedObject>();
-                InstanceUpdateQue = new List<InstancedObject>();
+                InstanceRenderQue?.Dispose();
+                InstanceUpdateQue?.Dispose();
+                InstanceBuildQue?.Dispose();
+                InstanceAddQue?.Dispose();
+                InstanceRemoveQue?.Dispose();
+                InstanceRenderQue = new HashedList<InstancedObject>();
+                InstanceUpdateQue = new HashedList<InstancedObject>();
                 InstanceRenderTransforms = new List<Transform>();
-                InstanceBuildQue = new List<InstancedObject>();
-                InstanceAddQue = new List<InstancedObject>();
-                InstanceRemoveQue = new List<InstancedObject>();
+                InstanceBuildQue = new HashedList<InstancedObject>();
+                InstanceAddQue = new HashedList<InstancedObject>();
+                InstanceRemoveQue = new HashedList<InstancedObject>();
             }
             MyMeshesCompacted = new List<MyMeshDataCompacted>();
             UnityLights = new List<LightData>();
@@ -1143,11 +1159,9 @@ namespace TrueTrace {
             Terrains = new List<TerrainObject>();
             Terrains = new List<TerrainObject>(GetComponentsInChildren<TerrainObject>());
             init();
-            AddQue = new List<ParentObject>();
-            RemoveQue = new List<ParentObject>();
-            RenderQue = new List<ParentObject>();
             RenderTransforms = new List<Transform>();
-            BuildQue = new List<ParentObject>(GameObject.FindObjectsOfType<ParentObject>());
+            BuildQue?.Dispose();
+            BuildQue = new HashedList<ParentObject>(GameObject.FindObjectsOfType<ParentObject>());
             List<ParentObject> TempQue = new List<ParentObject>(InstanceData.GetComponentsInChildren<ParentObject>());
             int QueCount = TempQue.Count;
             for(int i = 0; i < QueCount; i++) {
@@ -1182,7 +1196,7 @@ namespace TrueTrace {
             Terrains = new List<TerrainObject>(GetComponentsInChildren<TerrainObject>());
             init();
             List<ParentObject> TempQue = new List<ParentObject>(GameObject.FindObjectsOfType<ParentObject>());
-            InstanceAddQue = new List<InstancedObject>(GetComponentsInChildren<InstancedObject>());
+            InstanceAddQue = new HashedList<InstancedObject>(GetComponentsInChildren<InstancedObject>());
             InstanceData.BuildCombined();
             RunningTasks = 0;
             int QueCount = TempQue.Count;
@@ -1594,7 +1608,10 @@ namespace TrueTrace {
 
         BVH2Builder BVH;
         unsafe public void ConstructNewTLAS() {
-
+            if(TLASTask != null) {
+                TLASTask.Wait();
+                TLASTask.Dispose();
+            }
             #if HardwareRT
                 int TotLength = 0;
                 int MeshOffset = 0;
@@ -2268,13 +2285,15 @@ namespace TrueTrace {
                         TempMesh.Transform = TargetTransform.worldToLocalMatrix;
                         MyMeshesCompacted[InstanceRenderQue[i].CompactedMeshData] = TempMesh;
                     #if !HardwareRT
-                        TargetTransform.hasChanged = false;
+                        InstanceRenderTransforms[i].hasChanged = false;
                     #endif
                         MeshAABBs[InstanceRenderQue[i].CompactedMeshData] = InstanceRenderQue[i].InstanceParent.aabb_untransformed;
                         AABB aabb = InstanceRenderQue[i].InstanceParent.aabb_untransformed;
                         aabb.TransformAABB(TargetTransform.localToWorldMatrix);                  
                         TransformedAABBs[InstanceRenderQue[i].CompactedMeshData] = aabb;
-                        if(!ObjsToUpdate.Contains(InstanceRenderQue[i].InstanceParent)) ObjsToUpdate.Add(InstanceRenderQue[i].InstanceParent);
+                        #if HardwareRT
+                            if(!ObjsToUpdate.Contains(InstanceRenderQue[i].InstanceParent)) ObjsToUpdate.Add(InstanceRenderQue[i].InstanceParent);
+                        #endif
                     }
                 }
 

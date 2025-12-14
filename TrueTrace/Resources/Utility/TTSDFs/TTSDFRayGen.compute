@@ -1,4 +1,7 @@
 #include "../../GlobalDefines.cginc"
+#ifndef ReSTIRAdvancedValidation
+    #define ReSTIRAdvancedValidation
+#endif
 #ifndef DX11
     #pragma use_dxc
 #endif
@@ -131,7 +134,7 @@ inline void VisabilityCheck(SmallerRay ray, inout float dist) {
             return;
         }
     #else
-        Closest_Hit_Compute(ray, dist);
+        VisabilityCheckCompute(ray, dist);
     #endif
 }
 

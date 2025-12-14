@@ -130,6 +130,7 @@ struct BVHNode8Data {
 };
 
 StructuredBuffer<BVHNode8Data> cwbvh_nodes;
+StructuredBuffer<int> TLASBVH8Indices;
 
 
 /*

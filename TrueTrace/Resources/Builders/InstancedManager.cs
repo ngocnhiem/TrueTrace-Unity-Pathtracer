@@ -10,11 +10,11 @@ namespace TrueTrace {
     [System.Serializable][ExecuteInEditMode]
     public class InstancedManager : MonoBehaviour
     {
-        [HideInInspector] public List<ParentObject> AddQue;
-        [HideInInspector] public List<ParentObject> RemoveQue;
-        [HideInInspector] public List<ParentObject> BuildQue;
-        [HideInInspector] public List<ParentObject> RenderQue;
-        [HideInInspector] public List<ParentObject> TempQue;
+        [HideInInspector] public HashedList<ParentObject> AddQue;
+        [HideInInspector] public HashedList<ParentObject> RemoveQue;
+        [HideInInspector] public HashedList<ParentObject> BuildQue;
+        [HideInInspector] public HashedList<ParentObject> RenderQue;
+        [HideInInspector] public HashedList<ParentObject> TempQue;
         [HideInInspector] public List<Task> CurrentlyActiveTasks;
         [HideInInspector] public bool ParentCountHasChanged;
         [HideInInspector] public bool NeedsToUpdateTextures;
@@ -34,7 +34,8 @@ namespace TrueTrace {
 
         public void InitRelationships() {
             NeedsToReinit = false;
-            TempQue = new List<ParentObject>(this.GetComponentsInChildren<ParentObject>(false));
+            TempQue?.Dispose();
+            TempQue = new HashedList<ParentObject>(this.GetComponentsInChildren<ParentObject>(false));
             InstanceIndexes = new Dictionary<ParentObject, InstanceData>();
             InstancedObject[] InstanceQues = GameObject.FindObjectsOfType<InstancedObject>(false);
             int InstCount = InstanceQues.Length;
@@ -73,14 +74,14 @@ namespace TrueTrace {
             }
 
         }
-        public bool DoRendering = true;
+        public bool DoRendering = false;
         public void Update() {
             RenderInstances();
         }
 
         public void RenderInstances() {
             if(DoRendering) {
-                if(InstanceIndexes == null || TempQue == null || TempQue.Count == 0 || NeedsToReinit) InitRelationships();
+                if(InstanceIndexes == null || TempQue == null || NeedsToReinit) InitRelationships();
                 int Coun1 = TempQue.Count;
                 for(int i = 0; i < Coun1; i++) {
                     if (InstanceIndexes.TryGetValue(TempQue[i], out InstanceData ExistingList)) {
@@ -115,10 +116,14 @@ namespace TrueTrace {
 
         public void init()
         {
-            AddQue = new List<ParentObject>();
-            RemoveQue = new List<ParentObject>();
-            BuildQue = new List<ParentObject>();
-            RenderQue = new List<ParentObject>();
+            AddQue?.Dispose();
+            RemoveQue?.Dispose();
+            BuildQue?.Dispose();
+            RenderQue?.Dispose();
+            AddQue = new HashedList<ParentObject>();
+            RemoveQue = new HashedList<ParentObject>();
+            BuildQue = new HashedList<ParentObject>();
+            RenderQue = new HashedList<ParentObject>();
             CurrentlyActiveTasks = new List<Task>();
         }
 
@@ -132,11 +137,9 @@ namespace TrueTrace {
         public void EditorBuild()
         {
             init();
-            AddQue = new List<ParentObject>();
-            RemoveQue = new List<ParentObject>();
-            RenderQue = new List<ParentObject>();
+            BuildQue?.Dispose();
             CurrentlyActiveTasks = new List<Task>();
-            BuildQue = new List<ParentObject>(GetComponentsInChildren<ParentObject>());
+            BuildQue = new HashedList<ParentObject>(GetComponentsInChildren<ParentObject>());
             RunningTasks = 0;
             for (int i = 0; i < BuildQue.Count; i++)
             {

@@ -133,6 +133,11 @@ namespace TrueTrace {
          [SerializeField] public float aoRadius = 2.0f;
 
 
+         [SerializeField] public TTSettings PanoPreset;
+         [SerializeField] public TTSettings AnimationPreset;
+         [SerializeField] public TTSettings PresentationPreset;
+
+
 
          public bool GetGlobalDefine(string DefineToGet) {
             string globalDefinesPath = TTPathFinder.GetGlobalDefinesPath();
@@ -407,8 +412,11 @@ namespace TrueTrace {
             Parents.Children = new List<ParentData>();
             Parents.This = Parent;
             int ChildCount = Parent.childCount;
+            if(Parent.gameObject.TryGetComponent<LODGroup>(out LODGroup GroupTarg)) {
+               ChildCount = Mathf.Min(ChildCount, 1);
+            }
             for(int i = 0; i < ChildCount; i++) {
-               if(Parent.GetChild(i).gameObject.activeInHierarchy && !(Parent.GetChild(i).gameObject.name.Contains("LOD") && !Parent.GetChild(i).gameObject.name.Contains("LOD0"))) Parents.Children.Add(GrabChildren2(Parent.GetChild(i)));
+               if(Parent.GetChild(i).gameObject.activeInHierarchy) Parents.Children.Add(GrabChildren2(Parent.GetChild(i)));
 
             }
             return Parents;
@@ -1040,16 +1048,16 @@ Toolbar toolbar;
 
             switch(Prop) {
                case((int)Properties.MatCapColor):
-                  MatShader.MatCapColorValue = ColorProperties[VerboseColorProperties.IndexOf(AvailableIndexes[i].title)];
+                  MatShader.MatCapColorValue = ColorProperties[ColorProperties.IndexOf(AvailableIndexes[i].title)];
                break;
                case((int)Properties.EmissionColor):
-                  MatShader.EmissionColorValue = ColorProperties[VerboseColorProperties.IndexOf(AvailableIndexes[i].title)];
+                  MatShader.EmissionColorValue = ColorProperties[ColorProperties.IndexOf(AvailableIndexes[i].title)];
                break;
                case((int)Properties.EmissionIntensity):
                   MatShader.EmissionIntensityValue = FloatProperties[VerboseFloatProperties.IndexOf(AvailableIndexes[i].title)];
                break;
                case((int)Properties.AlbedoColor):
-                  MatShader.BaseColorValue = ColorProperties[VerboseColorProperties.IndexOf(AvailableIndexes[i].title)];
+                  MatShader.BaseColorValue = ColorProperties[ColorProperties.IndexOf(AvailableIndexes[i].title)];
                break;
                case((int)Properties.AlbedoTexture):
                   MatShader.AvailableTextures.Add(new TexturePairs() {
@@ -1192,7 +1200,6 @@ Toolbar toolbar;
       }
       List<string> ChannelProperties;
       List<string> VerboseFloatProperties;
-      List<string> VerboseColorProperties;
       List<string> VerboseTextureProperties;
       public DialogueNode CreateInputNode(string PropertyID, System.Type T, Vector2 Pos, string InitialValue = "null", int InputElement = -1, bool IsRange = false, Texture SampleTex = null) 
       {
@@ -1234,8 +1241,8 @@ Toolbar toolbar;
            } else if(T == typeof(Color)) {
                DropField.choices = ColorProperties;
                DropField.index = (int)Mathf.Max(ColorProperties.IndexOf(InitialValue),0);
-               dialogueNode.title = VerboseColorProperties[DropField.index];
-               DropField.RegisterValueChangedCallback(evt => {dialogueNode.title = VerboseColorProperties[DropField.index];});
+               dialogueNode.title = ColorProperties[DropField.index];
+               DropField.RegisterValueChangedCallback(evt => {dialogueNode.title = ColorProperties[DropField.index];});
                dialogueNode.inputContainer.Add(DropField);
            }else if(T == typeof(float)) {
                   DropField.choices = FloatProperties;
@@ -1311,7 +1318,6 @@ Toolbar toolbar;
          TextureProperties = new List<string>();
          ChannelProperties = new List<string>();
          VerboseFloatProperties = new List<string>();
-         VerboseColorProperties = new List<string>();
          VerboseTextureProperties = new List<string>();
          int PropCount = shader.GetPropertyCount();
          ColorProperties.Add("null");
@@ -1322,12 +1328,11 @@ Toolbar toolbar;
          ChannelProperties.Add("B");
          ChannelProperties.Add("A");
 
-         VerboseColorProperties.Add("null");
          VerboseFloatProperties.Add("null");
          VerboseTextureProperties.Add("null");
          for(int i = 0; i < PropCount; i++) {
             if(shader.GetPropertyType(i) == ShaderPropertyType.Texture) {TextureProperties.Add(shader.GetPropertyName(i)); VerboseTextureProperties.Add(shader.GetPropertyName(i));}
-            if(shader.GetPropertyType(i) == ShaderPropertyType.Color) {ColorProperties.Add(shader.GetPropertyName(i)); VerboseColorProperties.Add(shader.GetPropertyDescription(i));}
+            if(shader.GetPropertyType(i) == ShaderPropertyType.Color) {ColorProperties.Add(shader.GetPropertyName(i));}
             if(shader.GetPropertyType(i) == ShaderPropertyType.Float || shader.GetPropertyType(i) == ShaderPropertyType.Range) {FloatProperties.Add(shader.GetPropertyName(i)); VerboseFloatProperties.Add(shader.GetPropertyDescription(i));}
          }
          MatShader = AssetManager.data.Material.Find((s1) => s1.Name.Equals(shader.name));
@@ -1746,7 +1751,7 @@ Toolbar toolbar;
                // GIToggle.RegisterValueChangedCallback(evt => {ReSTIRGI = evt.newValue; RayMaster.LocalTTSettings.UseReSTIRGI = ReSTIRGI;if(evt.newValue) MainSource.Insert(MainSource.IndexOf(GIToggle) + 1, GIFoldout); else MainSource.Remove(GIFoldout);});
                if(CustToggle.value) ParentContainer.Add(ToggleableContainer);
             } else {
-               CustToggle.RegisterValueChangedCallback(evt => {SetGlobalDefines(TargetDefine, evt.newValue);});
+               CustToggle.RegisterValueChangedCallback(evt => {if(TargetDefine.Equals("RadCache")) RayMaster.LocalTTSettings.RadCacheToggle = evt.newValue; SetGlobalDefines(TargetDefine, evt.newValue);});
             }
          return CustToggle;
       }
@@ -1819,6 +1824,10 @@ Toolbar toolbar;
             // Toggle ReflectionMotionVectorToggle = new Toggle() {value = (definesList.Contains("TTReflectionMotionVectors")), text = "Accurate Mirror Motion Vectors(Experiemental)"};
             //    ReflectionMotionVectorToggle.tooltip = "A better way to calculate motion vectors for reflections in mirrors and such for ASVGF, requires \"RemoveRasterizationRequirement\"";
             // ReflectionMotionVectorToggle.RegisterValueChangedCallback(evt => {if(evt.newValue) {AddDefine("TTReflectionMotionVectors"); SetGlobalDefines("TTReflectionMotionVectors", true);} else {RemoveDefine("TTReflectionMotionVectors"); SetGlobalDefines("TTReflectionMotionVectors", false);}});
+
+            Toggle YanusModeToggle = new Toggle() {value = (definesList.Contains("TTYanusMode")), text = "Enable Settings used by Yanus"};
+               YanusModeToggle.tooltip = "Enabled settings used by Yanus";
+            YanusModeToggle.RegisterValueChangedCallback(evt => {if(evt.newValue) {AddDefine("TTYanusMode");} else {RemoveDefine("TTYanusMode");}});
 
             Toggle RasterizedDirectToggle = new Toggle() {value = (definesList.Contains("RasterizedDirect")), text = "Use Rasterized Lighting for Direct"};
                RasterizedDirectToggle.tooltip = "Removes the need for rasterized rendering(except when upscaling with TAAU), allowing you to turn it off in your camera for extra performance";
@@ -1907,6 +1916,7 @@ Toolbar toolbar;
             OIDNToggle.RegisterValueChangedCallback(evt => {if(evt.newValue) AddDefine("UseOIDN"); else RemoveDefine("UseOIDN");});
 
 
+
             Toggle RadCacheToggle = new Toggle() {value = (definesList.Contains("DisableRadianceCache")), text = "FULLY Disable Radiance Cache"};
                RadCacheToggle.tooltip = "Prevents use of the radcache entirely while this is enabled, as it frees up all resources/ram/vram the radiance cache uses";
             RadCacheToggle.RegisterValueChangedCallback(evt => {if(evt.newValue) {SetGlobalDefines("RadCache", false); AddDefine("DisableRadianceCache");} else {SetGlobalDefines("RadCache", true); RemoveDefine("DisableRadianceCache");}});
@@ -1924,6 +1934,7 @@ Toolbar toolbar;
                // CustomMotionVectorToggle.SetEnabled(false);
                // ReflectionMotionVectorToggle.SetEnabled(false);
                RasterizedDirectToggle.SetEnabled(false);
+               YanusModeToggle.SetEnabled(false);
                // BindlessToggle.SetEnabled(false);
                GaussianTreeToggle.SetEnabled(false);
                OIDNToggle.SetEnabled(false);
@@ -1946,6 +1957,7 @@ Toolbar toolbar;
                // ReflectionMotionVectorToggle.SetEnabled(true);
                RasterizedDirectToggle.SetEnabled(true);
                // BindlessToggle.SetEnabled(true);
+               YanusModeToggle.SetEnabled(true);
                GaussianTreeToggle.SetEnabled(true);
                OIDNToggle.SetEnabled(true);
                RadCacheToggle.SetEnabled(true);
@@ -2013,6 +2025,7 @@ Toolbar toolbar;
          #if TTAdvancedSettings
             NonPlayContainer.Add(RadCacheToggle);
          #endif
+
          // NonPlayContainer.Add(CustomMotionVectorToggle);
          // NonPlayContainer.Add(ReflectionMotionVectorToggle);
          #if TTAdvancedSettings
@@ -2029,12 +2042,19 @@ Toolbar toolbar;
          NonPlayContainer.Add(TriangleSplittingToggle);
          #if TTAdvancedSettings
             NonPlayContainer.Add(StrictMemoryReductionToggle);
-            NonPlayContainer.Add(MultiMapScreenshotToggle);
+            #if TTYanusMode
+               NonPlayContainer.Add(MultiMapScreenshotToggle);
+            #endif
          #endif
          NonPlayContainer.Add(PhotonMappingToggle);
          #if TTAdvancedSettings
             NonPlayContainer.Add(RemoveScriptsDuringSaveToggle);
-            NonPlayContainer.Add(TTIncrementRenderCounterToggle);
+            #if TTYanusMode
+               NonPlayContainer.Add(TTIncrementRenderCounterToggle);
+            #endif
+         #endif
+         #if TTAdvancedSettings
+            NonPlayContainer.Add(YanusModeToggle);
          #endif
          NonPlayContainer.Add(TTAdvancedSettingsToggle);
          NonPlayContainer.Add(new Label("-------------"));
@@ -2063,6 +2083,13 @@ Toolbar toolbar;
          #if TTAdvancedSettings
             PlayContainer.Add(CustomToggle("Use Light BVH", "LBVH", "Quick toggle to switch between the active light tree(Gaussian tree or light bvh), and simple RIS, like the default unity lights use"));
          #endif
+
+         #if TTAdvancedSettings
+            #if TTYanusMode
+               RayMaster.LocalTTSettings.RadCacheToggle = GetGlobalDefine("RadCache");
+            #endif
+         #endif
+
          PlayContainer.Add(CustomToggle("Quick RadCache Toggle", "RadCache", "Quick toggle for the radiance cache, does NOT affect memory used by the radiance cache, unlike the toggle above"));
          #if TTAdvancedSettings
             PlayContainer.Add(CustomToggle("Use Texture LOD", "UseTextureLOD", "DX12 Only - Uses a higher texture LOD for each bounce, which can help performance"));
@@ -2112,21 +2139,46 @@ Toolbar toolbar;
          Toggle DoSavingToggle = new Toggle() {value = DoSaving, text = "Enable RayTracingObject Saving"};
             DoSavingToggle.tooltip = "Allows saving any changes to your truetrace materials made during play mode";
          DoSavingToggle.RegisterValueChangedCallback(evt => {DoSaving = evt.newValue; RayTracingMaster.DoSaving = DoSaving;});
+         
          Toggle MatChangeResetsAccumToggle = new Toggle() {value = MatChangeResetsAccum, text = "Material Change Resets Accumulation"};
          MatChangeResetsAccumToggle.RegisterValueChangedCallback(evt => {MatChangeResetsAccum = evt.newValue; RayMaster.LocalTTSettings.MatChangeResetsAccum = MatChangeResetsAccum;});
+         
          VisualElement ScreenShotBox = new VisualElement();
          ScreenShotBox.style.flexDirection = FlexDirection.Row;
-         Label PathLabel = new Label() {text = "Screenshot Path: "};
-         PathLabel.style.color = Color.black;
-         if(System.IO.Directory.Exists(PlayerPrefs.GetString("ScreenShotPath"))) PathLabel.style.backgroundColor = Color.green;
-         else PathLabel.style.backgroundColor = Color.red;
-         TextField AbsolutePath = new TextField();
-         AbsolutePath.value = PlayerPrefs.GetString("ScreenShotPath");
-         AbsolutePath.RegisterValueChangedCallback(evt => {if(System.IO.Directory.Exists(evt.newValue)) {PathLabel.style.backgroundColor = Color.green;} else {PathLabel.style.backgroundColor = Color.red;} PlayerPrefs.SetString("ScreenShotPath", evt.newValue);});
-         ScreenShotBox.Add(PathLabel);
-         ScreenShotBox.Add(AbsolutePath);
+            Label PathLabel = new Label() {text = "Screenshot Path: "};
+            PathLabel.style.color = Color.black;
+            if(System.IO.Directory.Exists(PlayerPrefs.GetString("ScreenShotPath"))) PathLabel.style.backgroundColor = Color.green;
+            else PathLabel.style.backgroundColor = Color.red;
+            TextField AbsolutePath = new TextField();
+            AbsolutePath.value = PlayerPrefs.GetString("ScreenShotPath");
+            AbsolutePath.RegisterValueChangedCallback(evt => {if(System.IO.Directory.Exists(evt.newValue)) {PathLabel.style.backgroundColor = Color.green;} else {PathLabel.style.backgroundColor = Color.red;} PlayerPrefs.SetString("ScreenShotPath", evt.newValue);});
+            ScreenShotBox.Add(PathLabel);
+            ScreenShotBox.Add(AbsolutePath);
+   #if TTAdvancedSettings
+      #if TTYanusMode
+         VisualElement PresetBox = new VisualElement();
+            ObjectField PanoPresetField = new ObjectField();
+            PanoPresetField.objectType = typeof(TTSettings);
+            PanoPresetField.label = "Panorama Preset";
+            PanoPresetField.value = PanoPreset;
+            PanoPresetField.RegisterValueChangedCallback(evt => {PanoPreset = (TTSettings)evt.newValue;});
 
+            ObjectField AnimationPresetField = new ObjectField();
+            AnimationPresetField.objectType = typeof(TTSettings);
+            AnimationPresetField.label = "Animation Preset";
+            AnimationPresetField.value = AnimationPreset;
+            AnimationPresetField.RegisterValueChangedCallback(evt => {AnimationPreset = (TTSettings)evt.newValue;});
 
+            ObjectField PresentationPresetField = new ObjectField();
+            PresentationPresetField.objectType = typeof(TTSettings);
+            PresentationPresetField.label = "Presentation Preset";
+            PresentationPresetField.value = PresentationPreset;
+            PresentationPresetField.RegisterValueChangedCallback(evt => {PresentationPreset = (TTSettings)evt.newValue;});
+         PresetBox.Add(PanoPresetField);
+         PresetBox.Add(AnimationPresetField);
+         PresetBox.Add(PresentationPresetField);
+      #endif
+   #endif
          VisualElement PanoramaBox = new VisualElement();
          PanoramaBox.style.flexDirection = FlexDirection.Row;
          Label PanoramaLabel = new Label() {text = "Panorama Path: "};
@@ -2219,7 +2271,12 @@ Toolbar toolbar;
          HardSettingsMenu.Add(PanoramaBox);
          HardSettingsMenu.Add(TurnTableBox);
          HardSettingsMenu.Add(TimelineBox);
-         HardSettingsMenu.Add(CounterBox);
+      #if TTAdvancedSettings
+         #if TTYanusMode
+            HardSettingsMenu.Add(CounterBox);
+            HardSettingsMenu.Add(PresetBox);
+         #endif
+      #endif
          // HardSettingsMenu.Add(CorrectMatOptionsButton);
          HardSettingsMenu.Add(RemoveTrueTraceButton);
          
@@ -2651,6 +2708,7 @@ Toolbar toolbar;
                EditorUtility.SetDirty(Instanced);
                Instanced.ClearAll();
             }
+            if(RayMaster != null) RayMaster.ClearAll();
 
 
             Cleared = true;
@@ -2883,6 +2941,7 @@ Slider AperatureSlider;
            DoF = RayMaster.LocalTTSettings.PPDoF;
            ClayMetalOverride = RayMaster.LocalTTSettings.ClayMetalOverride;
            ClayRoughnessOverride = RayMaster.LocalTTSettings.ClayRoughnessOverride;
+           MaxSampCount = RayMaster.LocalTTSettings.MaxSampCount;
            ClayColor = RayMaster.LocalTTSettings.ClayColor;
            GroundColor = RayMaster.LocalTTSettings.GroundColor;
            DoFAperature = RayMaster.LocalTTSettings.DoFAperature;
@@ -2921,6 +2980,7 @@ Slider AperatureSlider;
            FireflyFrameCount = RayMaster.LocalTTSettings.FireflyFrameCount;
            FireflyFrameInterval = RayMaster.LocalTTSettings.FireflyFrameInterval;
            OIDNFrameCount = RayMaster.LocalTTSettings.OIDNFrameCount;
+           OIDNBlendRatio = RayMaster.LocalTTSettings.OIDNBlendRatio;
            RayMaster.IsFocusing = false;
            ConvBloom = RayMaster.LocalTTSettings.ConvBloom;
            ConvStrength = RayMaster.LocalTTSettings.ConvStrength;
@@ -2959,6 +3019,7 @@ Slider AperatureSlider;
                Assets.ClearAll();
                InstancedManager Instanced = GameObject.Find("InstancedStorage").GetComponent<InstancedManager>();
                EditorUtility.SetDirty(Instanced);
+               if(RayMaster != null) RayMaster.ClearAll();
                Instanced.ClearAll();
                Cleared = true;
                // Assets.RunningTasks = 0;
@@ -3291,28 +3352,112 @@ Slider AperatureSlider;
                EnclosingBox.Add(RemainingObjectsLabel);
                EnclosingBox.Add(RemainingObjectsField);
                EnclosingBox.Add(ReadyBox);
+  
+            #if TTAdvancedSettings
+               #if TTYanusMode
+                  Button SetPresetPano = new Button(() => {
+                        RayMaster.LoadTT();
+                        TTSettings TTTempSettings = PanoPreset;
+                           TTTempSettings.BackgroundType = RayMaster.LocalTTSettings.BackgroundType;
+                           TTTempSettings.BackgroundIntensity = RayMaster.LocalTTSettings.BackgroundIntensity;
+                           TTTempSettings.SceneBackgroundColor = RayMaster.LocalTTSettings.SceneBackgroundColor;
+                           TTTempSettings.SecondaryBackgroundType = RayMaster.LocalTTSettings.SecondaryBackgroundType;
+                           TTTempSettings.SecondarySceneBackgroundColor = RayMaster.LocalTTSettings.SecondarySceneBackgroundColor;
+                           TTTempSettings.HDRILongLat = RayMaster.LocalTTSettings.HDRILongLat;
+                           TTTempSettings.HDRIScale = RayMaster.LocalTTSettings.HDRIScale;
+                           TTTempSettings.PrimaryBackgroundTintColor = RayMaster.LocalTTSettings.PrimaryBackgroundTintColor;
+                           TTTempSettings.PrimaryBackgroundTint = RayMaster.LocalTTSettings.PrimaryBackgroundTint;
+                           TTTempSettings.PrimaryBackgroundContrast = RayMaster.LocalTTSettings.PrimaryBackgroundContrast;
+                           TTTempSettings.PPExposure = RayMaster.LocalTTSettings.PPExposure;
+                           TTTempSettings.ExposureAuto = RayMaster.LocalTTSettings.ExposureAuto;
+                           TTTempSettings.PPToneMap = RayMaster.LocalTTSettings.PPToneMap;
+                           TTTempSettings.Exposure = RayMaster.LocalTTSettings.Exposure;
+                           TTTempSettings.ToneMapper = RayMaster.LocalTTSettings.ToneMapper;
+                           TTTempSettings.LEMEnergyScale = RayMaster.LocalTTSettings.LEMEnergyScale;
+                           TTTempSettings.LightEnergyScale = RayMaster.LocalTTSettings.LightEnergyScale;
+                           TTTempSettings.IndirectBoost = RayMaster.LocalTTSettings.IndirectBoost;
+                        RayMaster.LocalTTSettings = TTTempSettings; 
+                        SetGlobalDefines("RadCache", PanoPreset.RadCacheToggle); 
+                        MainSource.Clear(); 
+                        CreateGUI();
+                     });
+                     SetPresetPano.text = "Panorama Preset";
+                  Button SetPresetAnimation = new Button(() => {
+                        RayMaster.LoadTT();
+                        TTSettings TTTempSettings = AnimationPreset;
+                           TTTempSettings.BackgroundType = RayMaster.LocalTTSettings.BackgroundType;
+                           TTTempSettings.BackgroundIntensity = RayMaster.LocalTTSettings.BackgroundIntensity;
+                           TTTempSettings.SceneBackgroundColor = RayMaster.LocalTTSettings.SceneBackgroundColor;
+                           TTTempSettings.SecondaryBackgroundType = RayMaster.LocalTTSettings.SecondaryBackgroundType;
+                           TTTempSettings.SecondarySceneBackgroundColor = RayMaster.LocalTTSettings.SecondarySceneBackgroundColor;
+                           TTTempSettings.HDRILongLat = RayMaster.LocalTTSettings.HDRILongLat;
+                           TTTempSettings.HDRIScale = RayMaster.LocalTTSettings.HDRIScale;
+                           TTTempSettings.PrimaryBackgroundTintColor = RayMaster.LocalTTSettings.PrimaryBackgroundTintColor;
+                           TTTempSettings.PrimaryBackgroundTint = RayMaster.LocalTTSettings.PrimaryBackgroundTint;
+                           TTTempSettings.PrimaryBackgroundContrast = RayMaster.LocalTTSettings.PrimaryBackgroundContrast;
+                           TTTempSettings.PPExposure = RayMaster.LocalTTSettings.PPExposure;
+                           TTTempSettings.ExposureAuto = RayMaster.LocalTTSettings.ExposureAuto;
+                           TTTempSettings.PPToneMap = RayMaster.LocalTTSettings.PPToneMap;
+                           TTTempSettings.Exposure = RayMaster.LocalTTSettings.Exposure;
+                           TTTempSettings.ToneMapper = RayMaster.LocalTTSettings.ToneMapper;
+                           TTTempSettings.LEMEnergyScale = RayMaster.LocalTTSettings.LEMEnergyScale;
+                           TTTempSettings.LightEnergyScale = RayMaster.LocalTTSettings.LightEnergyScale;
+                           TTTempSettings.IndirectBoost = RayMaster.LocalTTSettings.IndirectBoost;
+                        RayMaster.LocalTTSettings = TTTempSettings; 
+                        SetGlobalDefines("RadCache", AnimationPreset.RadCacheToggle); 
+                        MainSource.Clear(); 
+                        CreateGUI();
+                     });
+                     SetPresetAnimation.text = "Animation Preset";
+                  Button SetPresetPresentation = new Button(() => {
+                        RayMaster.LoadTT();
+                        TTSettings TTTempSettings = PresentationPreset;
+                           TTTempSettings.BackgroundType = RayMaster.LocalTTSettings.BackgroundType;
+                           TTTempSettings.BackgroundIntensity = RayMaster.LocalTTSettings.BackgroundIntensity;
+                           TTTempSettings.SceneBackgroundColor = RayMaster.LocalTTSettings.SceneBackgroundColor;
+                           TTTempSettings.SecondaryBackgroundType = RayMaster.LocalTTSettings.SecondaryBackgroundType;
+                           TTTempSettings.SecondarySceneBackgroundColor = RayMaster.LocalTTSettings.SecondarySceneBackgroundColor;
+                           TTTempSettings.HDRILongLat = RayMaster.LocalTTSettings.HDRILongLat;
+                           TTTempSettings.HDRIScale = RayMaster.LocalTTSettings.HDRIScale;
+                           TTTempSettings.PrimaryBackgroundTintColor = RayMaster.LocalTTSettings.PrimaryBackgroundTintColor;
+                           TTTempSettings.PrimaryBackgroundTint = RayMaster.LocalTTSettings.PrimaryBackgroundTint;
+                           TTTempSettings.PrimaryBackgroundContrast = RayMaster.LocalTTSettings.PrimaryBackgroundContrast;
+                           TTTempSettings.PPExposure = RayMaster.LocalTTSettings.PPExposure;
+                           TTTempSettings.ExposureAuto = RayMaster.LocalTTSettings.ExposureAuto;
+                           TTTempSettings.PPToneMap = RayMaster.LocalTTSettings.PPToneMap;
+                           TTTempSettings.Exposure = RayMaster.LocalTTSettings.Exposure;
+                           TTTempSettings.ToneMapper = RayMaster.LocalTTSettings.ToneMapper;
+                           TTTempSettings.LEMEnergyScale = RayMaster.LocalTTSettings.LEMEnergyScale;
+                           TTTempSettings.LightEnergyScale = RayMaster.LocalTTSettings.LightEnergyScale;
+                           TTTempSettings.IndirectBoost = RayMaster.LocalTTSettings.IndirectBoost;
+                        RayMaster.LocalTTSettings = TTTempSettings;  
+                        SetGlobalDefines("RadCache", PresentationPreset.RadCacheToggle); 
+                        MainSource.Clear(); 
+                        CreateGUI();
+                     });
+                     SetPresetPresentation.text = "Presentation Preset";
+                  Button SetPresetDefault = new Button(() => {RayMaster.LoadTT(); SetGlobalDefines("RadCache", RayMaster.LocalTTSettings); MainSource.Clear(); CreateGUI();});
+                     SetPresetDefault.text = "Default Preset";
+                  EnclosingBox.Add(SetPresetPano);
+                  EnclosingBox.Add(SetPresetAnimation);
+                  EnclosingBox.Add(SetPresetPresentation);
+                  EnclosingBox.Add(SetPresetDefault);
+               #endif
+            #endif
             MainSource.Add(EnclosingBox);
 
         }
 
 
-        RayCastMaterialSelector TempTest;
-        int AFrame = -1;
         int FramesSinceDOF = 0;
         string PrevLocTTSettingsName = "";
         void Update() {
-            if(AFrame != -1) {
+            if(RayMaster.RaycastSelectedIndex != -1) {
                RayTracingObjectEditor[] editors = (RayTracingObjectEditor[])Resources.FindObjectsOfTypeAll(typeof(RayTracingObjectEditor));
                if (editors.Length > 0) {
-                  editors[0].SetSelected(AFrame);
+                  editors[0].SetSelected(RayMaster.RaycastSelectedIndex);
                }
-               AFrame = -1;
-            }
-            if(Application.isFocused && Input.GetMouseButton(2) && !Input.GetKey(KeyCode.LeftControl)) {
-               if(Input.mousePosition.x >= 0 && Input.mousePosition.x < RayMaster.SourceWidth && Input.mousePosition.y >= 0 && Input.mousePosition.y < RayMaster.SourceHeight) {
-                  if(TempTest == null) TempTest = new RayCastMaterialSelector();
-                  AFrame = TempTest.CastRay(RayTracingMaster._camera, RayMaster.SourceWidth, RayMaster.SourceHeight);
-               }
+               RayMaster.RaycastSelectedIndex = -1;
             }
             if(RayMaster != null) {
                if(Application.isPlaying && RayTracingMaster.RayMaster != null && RayTracingMaster.RayMaster.LocalTTSettings != null) {

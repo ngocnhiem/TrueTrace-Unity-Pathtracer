@@ -663,7 +663,7 @@ static float3 SampleDisneySpecTransmission(const MaterialData hitDat, float3 wo,
     return G1v * 0.99f;// * exp(-CalculateExtinction(1.0f - hitDat.surfaceColor, hitDat.scatterDistance == 0 ? 1 : hitDat.scatterDistance) * (hitDat.scatterDistance));
 }
 
-static float3 SampleDisneyDiffuse(const MaterialData hitDat, float3 wo, bool thin, out float forwardPdfW, out float3 wi, inout bool refracted, uint pixel_index)
+static float3 SampleDisneyDiffuse(MaterialData hitDat, float3 wo, bool thin, out float forwardPdfW, out float3 wi, inout bool refracted, uint pixel_index)
 {
     wi = 0;
     forwardPdfW = 0;
@@ -693,7 +693,7 @@ static float3 SampleDisneyDiffuse(const MaterialData hitDat, float3 wo, bool thi
         refracted = true;
 
         if (thin) {
-            color = sqrt(color / PI) * PI;
+            hitDat.surfaceColor = sqrt(color / PI) * PI;
         }
         else {
             extinction = CalculateExtinction(hitDat.transmittanceColor, hitDat.scatterDistance);

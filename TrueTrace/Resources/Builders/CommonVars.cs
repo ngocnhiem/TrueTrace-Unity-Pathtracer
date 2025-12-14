@@ -16,11 +16,12 @@ namespace CommonVars
         Radius = 0.0f;
        }
        public void Validate(float padding) {
-        Radius = Mathf.Max(Radius, padding);
+        if(Radius < padding)
+            Radius = padding;
        }
 
-       public void Extend(Vector3 A) {
-        Radius = Mathf.Max(Radius, Vector3.Distance(Center, A));
+       public void Extend(in Vector3 A) {
+        Radius = (float)System.Math.Max(Radius, Vector3.Distance(Center, A));
        }
     }
 
@@ -456,7 +457,7 @@ namespace CommonVars
             Pad1 = 0;
         }
 
-        public LightBounds(AABB aabb, Vector3 W, float Phi, float Theta_o, float Theta_e, int lc, int p1) {
+        public LightBounds(in AABB aabb, in Vector3 W, float Phi, float Theta_o, float Theta_e, int lc, int p1) {
             b = aabb;
             w = W;
             phi = Phi;
@@ -478,7 +479,7 @@ namespace CommonVars
             public Vector3 W;
             public float cosTheta;
 
-            public DirectionCone(Vector3 w, float cosTheta) {
+            public DirectionCone(in Vector3 w, float cosTheta) {
                 W = w;
                 this.cosTheta = cosTheta;
             }
@@ -493,7 +494,7 @@ namespace CommonVars
         public uint cosTheta_oe;
         public int left;
 
-        public CompactLightBVHData(Vector3 BBMax, Vector3 BBMin, uint W, float Phi, uint cosTheta_oe, int left) {
+        public CompactLightBVHData(in Vector3 BBMax, in Vector3 BBMin, uint W, float Phi, uint cosTheta_oe, int left) {
             this.BBMax = BBMax;
             this.BBMin = BBMin;
             w = W;
@@ -515,12 +516,23 @@ namespace CommonVars
             BBMin = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
         }
 
-        public AABB(CudaTriangle Tri) { 
-            BBMax = Vector3.Max(Vector3.Max(Tri.pos0, Tri.pos0 + Tri.posedge1), Tri.pos0 + Tri.posedge2);
-            BBMin = Vector3.Min(Vector3.Min(Tri.pos0, Tri.pos0 + Tri.posedge1), Tri.pos0 + Tri.posedge2);
+        public AABB(in CudaTriangle Tri) { 
+            BBMax = Tri.pos0;
+            BBMin = Tri.pos0;
+            Extend(Tri.pos0 + Tri.posedge1);
+            Extend(Tri.pos0 + Tri.posedge2);
+            // BBMax = Vector3.Max(Vector3.Max(Tri.pos0, Tri.pos0 + Tri.posedge1), Tri.pos0 + Tri.posedge2);
+            // BBMin = Vector3.Min(Vector3.Min(Tri.pos0, Tri.pos0 + Tri.posedge1), Tri.pos0 + Tri.posedge2);
             // this.Validate(new Vector3(0.1f,0.1f,0.1f));
         }
-        public void TransformAABB(Matrix4x4 Mat) { 
+        public void SetAABB(ref CudaTriangle Tri) { 
+            BBMax = Tri.pos0;
+            BBMin = Tri.pos0;
+            Extend(Tri.pos0 + Tri.posedge1);
+            Extend(Tri.pos0 + Tri.posedge2);
+            // this.Validate(new Vector3(0.1f,0.1f,0.1f));
+        }
+        public void TransformAABB(in Matrix4x4 Mat) { 
             Vector3 center = 0.5f * (BBMin + BBMax);
             Vector3 extent = 0.5f * (BBMax - BBMin);
             Vector3 new_center = CommonFunctions.transform_position(Mat, center);
@@ -548,11 +560,22 @@ namespace CommonVars
             return Sizes[Axis];
         }
 
-        public void ShrinkToFit(AABB SideAABB) {
-            BBMax = Vector3.Min(BBMax, SideAABB.BBMax);
-            BBMin = Vector3.Max(BBMin, SideAABB.BBMin);
+        public void ShrinkToFit(ref AABB aabb) {
+            if (aabb.BBMin.x > BBMin.x)
+                BBMin.x = aabb.BBMin.x;
+            if (aabb.BBMin.y > BBMin.y)
+                BBMin.y = aabb.BBMin.y;
+            if (aabb.BBMin.z > BBMin.z)
+                BBMin.z = aabb.BBMin.z;
+
+            if (aabb.BBMax.x < BBMax.x)
+                BBMax.x = aabb.BBMax.x;
+            if (aabb.BBMax.y < BBMax.y)
+                BBMax.y = aabb.BBMax.y;
+            if (aabb.BBMax.z < BBMax.z)
+                BBMax.z = aabb.BBMax.z;
         }
-        public void Create(Vector3 A, Vector3 B)
+        public void Create(in Vector3 A, in Vector3 B)
         {
             this.BBMax = A;//new Vector3(System.Math.Max(A.x, B.x), System.Math.Max(A.y, B.y), System.Math.Max(A.z, B.z));
             this.BBMin = A;//new Vector3(System.Math.Min(A.x, B.x), System.Math.Min(A.y, B.y), System.Math.Min(A.z, B.z));
@@ -601,7 +624,7 @@ namespace CommonVars
                 BBMax.z = aabb.BBMax.z;
         }
 
-        public AABB Union(AABB aabb)
+        public AABB Union(in AABB aabb)
         {
             AABB ResultAABB;
             ResultAABB.BBMax = BBMax;
@@ -622,7 +645,7 @@ namespace CommonVars
             return ResultAABB;
         }
 
-        public void Extend(Vector3 P)
+        public void Extend(in Vector3 P)
         {
 
             if (P.x < BBMin.x)
@@ -639,7 +662,7 @@ namespace CommonVars
                 BBMax.z = P.z;
         }
 
-        public bool IsInside(Vector3 P)
+        public bool IsInside(in Vector3 P)
         {
 
             if (P.x < BBMin.x)
@@ -657,7 +680,7 @@ namespace CommonVars
             return false;
         }
 
-        public void Validate(Vector3 Scale)
+        public void Validate(in Vector3 Scale)
         {
             for (int i2 = 0; i2 < 3; i2++)
             {
@@ -748,46 +771,39 @@ namespace CommonVars
         public uint MatDat;
         public uint IsEmissive;
 
-        Vector3 split_edge(int axis, float position, Vector3 a, Vector3 b) {
+        Vector3 split_edge(int axis, float position, ref Vector3 a, ref Vector3 b) {
             float t = (position - a[axis]) / (b[axis] - a[axis]);
             return a + t * (b - a);
         }
-        public AABB[] Split(int axis, float position) {
+        public void Split(int axis, float position, ref AABB[] Output) {
             Vector3[] p = { pos0, pos0 + posedge1, pos0 + posedge2 };
-            AABB left  = new AABB();
-            left.init();
-            AABB right = new AABB();
-            right.init();
+            Output[0].init();
+            Output[1].init();
             bool q0 = p[0][axis] <= position;
             bool q1 = p[1][axis] <= position;
             bool q2 = p[2][axis] <= position;
-            if (q0) left.Extend(p[0]);
-            else    right.Extend(p[0]);
-            if (q1) left.Extend(p[1]);
-            else    right.Extend(p[1]);
-            if (q2) left.Extend(p[2]);
-            else    right.Extend(p[2]);
+            if (q0) Output[0].Extend(p[0]);
+            else    Output[1].Extend(p[0]);
+            if (q1) Output[0].Extend(p[1]);
+            else    Output[1].Extend(p[1]);
+            if (q2) Output[0].Extend(p[2]);
+            else    Output[1].Extend(p[2]);
             if (q0 ^ q1) {
-                Vector3 m = split_edge(axis, position, p[0], p[1]);
-                left.Extend(m);
-                right.Extend(m);
+                Vector3 m = split_edge(axis, position, ref p[0], ref p[1]);
+                Output[0].Extend(m);
+                Output[1].Extend(m);
             }
             if (q1 ^ q2) {
-                Vector3 m = split_edge(axis, position, p[1], p[2]);
-                left.Extend(m);
-                right.Extend(m);
+                Vector3 m = split_edge(axis, position, ref p[1], ref p[2]);
+                Output[0].Extend(m);
+                Output[1].Extend(m);
             }
             if (q2 ^ q0) {
-                Vector3 m = split_edge(axis, position, p[2], p[0]);
-                left.Extend(m);
-                right.Extend(m);
+                Vector3 m = split_edge(axis, position, ref p[2], ref p[0]);
+                Output[0].Extend(m);
+                Output[1].Extend(m);
             }
-            AABB[] RetAABB = new AABB[2];
-            // left.Validate(new Vector3(0.0001f,0.0001f,0.0001f));
-            // right.Validate(new Vector3(0.0001f,0.0001f,0.0001f));
-            RetAABB[0] = left;
-            RetAABB[1] = right;
-            return RetAABB;
+            CommonFunctions.DeepClean(ref p);
         }
 
     }
@@ -849,7 +865,57 @@ namespace CommonVars
     }
 
 
+    public class HashedList<T>
+    {
+        private List<T> LocalList;
+        private HashSet<T> LocalHash;
 
+        public HashedList() {
+            this.LocalList = new List<T>();
+            this.LocalHash = new HashSet<T>();
+        }
+        public HashedList(in T[] Temp) {
+            this.LocalList = new List<T>(Temp);
+            this.LocalHash = new HashSet<T>(Temp);
+        }
+        public bool Add(T item) {
+            if(!LocalHash.Add(item)) return false;
+            LocalList.Add(item);
+            return true;
+        }
+
+        public bool Remove(T item) {
+            if(!LocalHash.Remove(item)) return false;
+            LocalList.Remove(item);
+            return true;
+        }
+
+        public bool Contains(T item) {
+            return LocalHash.Contains(item);
+        }
+
+        public int IndexOf(T item) {
+            if(LocalHash.Contains(item)) return LocalList.IndexOf(item);
+            else return -1;
+        }
+        public void RemoveAt(int i) {
+            LocalHash.Remove(LocalList[i]);
+            LocalList.RemoveAt(i);
+        }
+        public void Clear() {
+            LocalHash?.Clear();
+            LocalHash?.TrimExcess();
+            LocalList?.Clear();
+            LocalList?.TrimExcess();
+        }
+        public void Dispose() {
+            Clear();
+            LocalHash = null;
+            LocalList = null;
+        }
+        public int Count => LocalList.Count;
+        public T this[int i] => LocalList[i];
+    }  
 
 
     public struct TTStopWatch {//stopwatch stuff
@@ -889,10 +955,10 @@ namespace CommonVars
     public static class CommonFunctions
     {
 
-        public static Vector4 ToVector4(Vector3 A, float B) {
+        public static Vector4 ToVector4(in Vector3 A, float B) {
             return new Vector4(A.x, A.y, A.z, B);
         }
-        public static Vector3 ToVector3(Vector4 A) {
+        public static Vector3 ToVector3(in Vector4 A) {
             return new Vector3(A.x, A.y, A.z);
         }
 
@@ -912,7 +978,7 @@ namespace CommonVars
             if (TargetBuffer != null) TargetBuffer?.Dispose();
             TargetBuffer = new ComputeBuffer(Count, Stride, ComputeType, ComputeMode);
         }
-        public static void CreateComputeBuffer<T>(ref ComputeBuffer buffer, List<T> data, int stride)
+        public static void CreateComputeBuffer<T>(ref ComputeBuffer buffer, in List<T> data, int stride)
             where T : struct
         {
             // Do we already have a compute buffer?
@@ -939,7 +1005,7 @@ namespace CommonVars
             }
         }
 
-        unsafe public static void Aggregate(ref BVHNode8DataCompressed[] AggNodes, TrueTrace.BVH8Builder BVH)
+        unsafe public static void Aggregate(ref BVHNode8DataCompressed[] AggNodes, in TrueTrace.BVH8Builder BVH)
         {//Compress the CWBVH
             BVHNode8DataCompressed TempBVHNode = new BVHNode8DataCompressed();
             int BVHLength = BVH.cwbvhnode_count;
@@ -978,28 +1044,21 @@ namespace CommonVars
         }
 
         //Better Bounding Box Transformation by Zuex(I got it from Zuen)
-        public static Vector3 transform_position(Matrix4x4 matrix, Vector3 position)
+        public static Vector3 transform_position(in Matrix4x4 m, in Vector3 position)
         {
             return new Vector3(
-                matrix[0, 0] * position.x + matrix[0, 1] * position.y + matrix[0, 2] * position.z + matrix[0, 3],
-                matrix[1, 0] * position.x + matrix[1, 1] * position.y + matrix[1, 2] * position.z + matrix[1, 3],
-                matrix[2, 0] * position.x + matrix[2, 1] * position.y + matrix[2, 2] * position.z + matrix[2, 3]
+                m.m00 * position.x + m.m01 * position.y + m.m02 * position.z + m.m03,
+                m.m10 * position.x + m.m11 * position.y + m.m12 * position.z + m.m13,
+                m.m20 * position.x + m.m21 * position.y + m.m22 * position.z + m.m23
             );
         }
-        public static Vector3 transform_direction(Matrix4x4 matrix, Vector3 direction)
+        public static Vector3 transform_direction(in Matrix4x4 m, in Vector3 direction)
         {
             return new Vector3(
-                Mathf.Abs(matrix[0, 0]) * direction.x + Mathf.Abs(matrix[0, 1]) * direction.y + Mathf.Abs(matrix[0, 2]) * direction.z,
-                Mathf.Abs(matrix[1, 0]) * direction.x + Mathf.Abs(matrix[1, 1]) * direction.y + Mathf.Abs(matrix[1, 2]) * direction.z,
-                Mathf.Abs(matrix[2, 0]) * direction.x + Mathf.Abs(matrix[2, 1]) * direction.y + Mathf.Abs(matrix[2, 2]) * direction.z
+                (float)System.Math.Abs(m.m00) * direction.x + (float)System.Math.Abs(m.m01) * direction.y + (float)System.Math.Abs(m.m02) * direction.z,
+                (float)System.Math.Abs(m.m10) * direction.x + (float)System.Math.Abs(m.m11) * direction.y + (float)System.Math.Abs(m.m12) * direction.z,
+                (float)System.Math.Abs(m.m20) * direction.x + (float)System.Math.Abs(m.m21) * direction.y + (float)System.Math.Abs(m.m22) * direction.z
             );
-        }
-        public static void abs(ref Matrix4x4 matrix)
-        {
-            for (int i = 0; i < 4; i++)
-            {
-                for (int i2 = 0; i2 < 4; i2++) matrix[i, i2] = Mathf.Abs(matrix[i, i2]);
-            }
         }
         public static void SetComputeBuffer(this ComputeShader Shader, int kernel, string name, ComputeBuffer buffer)
         {
@@ -1037,12 +1096,7 @@ namespace CommonVars
             if (Buff != null) {Buff.Release(); Buff = null;}
         }
 
-        static Vector2 msign(Vector2 v)
-        {
-            return new Vector2((v.x >= 0.0f) ? 1.0f : -1.0f, (v.y >= 0.0f) ? 1.0f : -1.0f);
-        }
-
-        public static uint PackOctahedral(Vector3 nor)
+        public static uint PackOctahedral(in Vector3 nor)
         {
             const float halfMaxUInt16 = 32767.5f;
 
@@ -1062,11 +1116,11 @@ namespace CommonVars
         }
 
 
-        public static Vector3 UnpackOctahedral(uint data) {
+        public static Vector3 UnpackOctahedral(in uint data) {
             uint ivx = (uint)(data) & 65535u; 
             uint ivy = (uint)(data>>16 ) & 65535u; 
             Vector2 v = new Vector2(ivx/32767.5f, ivy/32767.5f) - Vector2.one;
-            Vector3 nor = new Vector3(v.x, v.y, 1.0f - Mathf.Abs(v.x) - Mathf.Abs(v.y)); // Rune Stubbe's version,
+            Vector3 nor = new Vector3(v.x, v.y, 1.0f - (float)System.Math.Abs(v.x) - (float)System.Math.Abs(v.y)); // Rune Stubbe's version,
             float t = Mathf.Max(-nor.z,0.0f);                     // much faster than original
             nor.x += (nor.x >= 0) ? -t : t;
             nor.y += (nor.y >= 0) ? -t : t;
@@ -1156,7 +1210,7 @@ namespace CommonVars
             return System.Runtime.InteropServices.Marshal.SizeOf<T>();
         }
 
-        public static void CreateComputeBuffer<T>(ref ComputeBuffer buffer, List<T> data)
+        public static void CreateComputeBuffer<T>(ref ComputeBuffer buffer, in List<T> data)
             where T : struct
         {
             int stride = System.Runtime.InteropServices.Marshal.SizeOf<T>();
@@ -1173,7 +1227,7 @@ namespace CommonVars
                 if (buffer == null) buffer = new ComputeBuffer(1, stride);
             }
         }
-        public static void CreateComputeBuffer<T>(ref ComputeBuffer buffer, T[] data)
+        public static void CreateComputeBuffer<T>(ref ComputeBuffer buffer, in T[] data)
             where T : struct
         {
             int stride = System.Runtime.InteropServices.Marshal.SizeOf<T>();
@@ -1217,7 +1271,7 @@ namespace CommonVars
             return (((int)FlagVar >> (int)flag) & (int)1) == 1;
         }
 
-        public static uint packRGBE(Color v)
+        public static uint packRGBE(in Color v)
         {
             Vector3 va = new Vector3(v.r, v.g, v.b);
             float max_abs = va.x;//, Mathf.Max(va.y, va.z));
@@ -1291,6 +1345,97 @@ namespace CommonVars
             NewMat.MatCapColor = Vector3.one;
             NewMat.CausticStrength = 1;
             return NewMat;
+        }
+        static unsafe uint getKey(float value)
+        {
+            // Integer comparisons between numbers returned from this function behave
+            // as if the original float values where compared.
+            // Simple reinterpretation works only for [0, ...], but this also handles negatives
+            uint f = *(uint*)&value;
+            uint mask = (uint)((int)f >> 31 | (1 << 31));
+            return f ^ mask;
+        }
+
+        static unsafe void tinybvh_swap(int** a, int** b)
+        {
+            int* t = *a;
+            *a = *b;
+            *b = t;
+        }
+        public static unsafe void RadixSort( int* input, int* output, ref float* SAH, int len) {
+            // http://stereopsis.com/radix.html - Beats std::sort unless for small inputs (say len <= ~64)
+            int radixSize = 11;
+            int binSize = 1 << radixSize;
+            int mask = binSize - 1;
+            int passes = 3;
+            int[] prefixSum = new int[binSize * passes];
+            // Compute histogram for all passes
+            for (int i = 0; i < len; i++) {
+                uint key = getKey(SAH[input[i]]);
+                prefixSum[((key >> (0 * radixSize)) & mask) + 0 * binSize]++;
+                prefixSum[((key >> (1 * radixSize)) & mask) + 1 * binSize]++;
+                prefixSum[((key >> (2 * radixSize)) & mask) + 2 * binSize]++;
+            }
+            // Compute prefix sum for all passes
+            int sum0 = 0, sum1 = 0, sum2 = 0;
+            for (int i = 0; i < binSize; i++) {
+                int temp0 = prefixSum[i + 0 * binSize];
+                int temp1 = prefixSum[i + 1 * binSize];
+                int temp2 = prefixSum[i + 2 * binSize];
+                prefixSum[i + 0 * binSize] = sum0;
+                prefixSum[i + 1 * binSize] = sum1;
+                prefixSum[i + 2 * binSize] = sum2;
+                sum0 += temp0;
+                sum1 += temp1; 
+                sum2 += temp2;
+            }
+            // Sort from LSB to MSB in radix-sized steps
+            for (int i = 0; i < passes; i++) {
+                for (int j = 0; j < len; j++) {
+                    int element = input[j];
+                    uint key0 = getKey(SAH[element]);
+                    output[(prefixSum[((key0 >> (i * radixSize)) & mask) + i * binSize]++)] = element;
+                }
+                tinybvh_swap( &input, &output );
+            }
+            DeepClean(ref prefixSum);
+        }
+
+        public static unsafe void RadixSort( int* input, int* output, ref float* SAH, ref int* prefixSum, int len) {
+            // http://stereopsis.com/radix.html - Beats std::sort unless for small inputs (say len <= ~64)
+            int radixSize = 11;
+            int binSize = 1 << radixSize;
+            int mask = binSize - 1;
+            int passes = 3;
+            // Compute histogram for all passes
+            for (int i = 0; i < len; i++) {
+                uint key = getKey(SAH[input[i]]);
+                prefixSum[((key >> (0 * radixSize)) & mask) + 0 * binSize]++;
+                prefixSum[((key >> (1 * radixSize)) & mask) + 1 * binSize]++;
+                prefixSum[((key >> (2 * radixSize)) & mask) + 2 * binSize]++;
+            }
+            // Compute prefix sum for all passes
+            int sum0 = 0, sum1 = 0, sum2 = 0;
+            for (int i = 0; i < binSize; i++) {
+                int temp0 = prefixSum[i + 0 * binSize];
+                int temp1 = prefixSum[i + 1 * binSize];
+                int temp2 = prefixSum[i + 2 * binSize];
+                prefixSum[i + 0 * binSize] = sum0;
+                prefixSum[i + 1 * binSize] = sum1;
+                prefixSum[i + 2 * binSize] = sum2;
+                sum0 += temp0;
+                sum1 += temp1; 
+                sum2 += temp2;
+            }
+            // Sort from LSB to MSB in radix-sized steps
+            for (int i = 0; i < passes; i++) {
+                for (int j = 0; j < len; j++) {
+                    int element = input[j];
+                    uint key0 = getKey(SAH[element]);
+                    output[(prefixSum[((key0 >> (i * radixSize)) & mask) + i * binSize]++)] = element;
+                }
+                tinybvh_swap( &input, &output );
+            }
         }
 
 

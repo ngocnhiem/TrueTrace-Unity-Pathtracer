@@ -3,10 +3,11 @@ For more in depth/full details, go to the Readme on the Truetrace Github(at leas
 
 
 To get started:
-1. After importing the unity package, for a new scene you want to open the PathTracer tab on the top bar, and click "Arrange Hierarchy"
-2. After doing this, your scene should now be in the format required by the path tracer
-3. Now you can click "Build Aggregated BVH" to build the acceleration structure for all objects, and just wait for the "Remaining Objects" to turn green before entering play mode(this can be ignored if wanted)
-4. After that is done, you can just enter play mode and play as normal
+1. First, import the unity package.  After doing this you will need to restart unity this one time, so that the bindless plugin initialized properly.
+2. After restarting, for a new scene you want to open the PathTracer tab on the top bar, and click "Arrange Hierarchy"
+3. After doing this, your scene should now be in the format required by the path tracer
+4. Now you can click "Build Aggregated BVH" to build the acceleration structure for all objects, and just wait for the "Remaining Objects" to turn green before entering play mode(this can be ignored if wanted)
+5. After that is done, you can just enter play mode and play as normal
 
 
 Adding new objects
@@ -26,6 +27,16 @@ Adding new objects
   		For Skinned Meshes:
 			Any parent gameobject of the RayTracingObjects(will group together all Skinned Children)
 	For default unity lights, you just add the "RayTracingLight" script to each one
+
+
+What to do if your scene is all white/textures dont load:
+This is due to truetrace not recognizing the shader used by your materials.  Thus, to fix this you will have to tell truetrace what each texture represents(I promise its not hard, and no there's no way to automate it).
+1. First, open up the truetrace settings menu and navigate to the "Material Pair Options" tab.
+2. You will see a slot at the top for a material.  Drag ANY material that uses the unrecognized shader into this slot(This will all only need to be done once per shader, NOT per material, but doing it with a material this way lets me display textures nicely).
+3. After this, you will see an output block with a lot of plugs. You dont need to fill these all out, only what you want truetrace to use.
+4. At the top left, there will be 3 buttons, one for adding texture nodes, one for adding color nodes, and one for adding float nodes.  Clicking these will spawn their respective node, and will serve as inputs to the Output node via the plugs.
+5. Simply drag the plugs from the input to the output, note that each output plug needs a unique input node(but these unique nodes can use the same texture/source, we just cant have a single input node directly point to 2 output plugs).
+6. After you have set up the plugs you want, just click "Apply Material Links" at the top, and rebuild the aggregated BVH to display the changes.
 
 General Use/Notes
 	DX12 is recommended, as it enables use of OIDN, Bindless texturing, RT Cores, and slightly higher performance

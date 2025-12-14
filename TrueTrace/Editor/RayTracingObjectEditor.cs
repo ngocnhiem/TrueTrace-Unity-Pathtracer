@@ -549,6 +549,17 @@ namespace TrueTrace {
                 string FolderName = "COPYPASTEBUFFER";
                 string PresetName = "COPYPASTEBUFFER";
                 UnityEditor.AssetDatabase.Refresh();
+                if(RayMaster.LocalTTSettings.CurrentTargetFile == "") {
+                    string TempFilePath = TTPathFinder.GetMaterialPresetsPath();
+                    var info = new DirectoryInfo(TempFilePath);
+                    var fileInfo = info.GetFiles();
+                    for(int i = 0; i < fileInfo.Length; i++) {
+                        if(!fileInfo[i].Name.Contains(".xml.meta") && fileInfo[i].Name.Contains(".xml")) {
+                            RayMaster.LocalTTSettings.CurrentTargetFile = TempFilePath + fileInfo[i].Name;
+                            break;
+                        }
+                    }
+                }
                 using (var A = new StringReader(Resources.Load<TextAsset>("Utility/MaterialPresets/" + RayMaster.LocalTTSettings.CurrentTargetFile.Substring(RayMaster.LocalTTSettings.CurrentTargetFile.LastIndexOf("/") + 1).Replace(".xml", "")).text)) {
                     var serializer = new XmlSerializer(typeof(RayObjFolderMaster));
                     PresetMaster = serializer.Deserialize(A) as RayObjFolderMaster;
@@ -1109,7 +1120,7 @@ namespace TrueTrace {
                                 ConnectionSources.Add("Smoothness", GUILayoutUtility.GetLastRect()); // Store position
                                 ConnectionSourceNames.Add("Smoothness");
                                 Flag = CommonFunctions.SetFlagVar(Flag, CommonFunctions.Flags.InvertSmoothnessTexture, EditorGUILayout.ToggleLeft("Invert Roughness Tex", Flag.GetFlag(CommonFunctions.Flags.InvertSmoothnessTexture), GUILayout.MaxWidth(135)));
-                                Flag = CommonFunctions.SetFlagVar(Flag, CommonFunctions.Flags.ShadowCaster, EditorGUILayout.ToggleLeft("Casts Shadows", Flag.GetFlag(CommonFunctions.Flags.ShadowCaster), GUILayout.MaxWidth(135)));
+                                Flag = CommonFunctions.SetFlagVar(Flag, CommonFunctions.Flags.ShadowCaster, !EditorGUILayout.ToggleLeft("Casts Shadows", !Flag.GetFlag(CommonFunctions.Flags.ShadowCaster), GUILayout.MaxWidth(135)));
                                 Flag = CommonFunctions.SetFlagVar(Flag, CommonFunctions.Flags.UseVertexColors, EditorGUILayout.ToggleLeft("Vertex Colors", Flag.GetFlag(CommonFunctions.Flags.UseVertexColors), GUILayout.MaxWidth(135)));
                             EditorGUILayout.EndHorizontal();
                             EditorGUILayout.BeginHorizontal();

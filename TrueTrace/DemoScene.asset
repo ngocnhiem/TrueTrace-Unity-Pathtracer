@@ -19,7 +19,7 @@ MonoBehaviour:
   UseRussianRoulette: 1
   UseNEE: 1
   DoTLASUpdates: 1
-  Accumulate: 1
+  Accumulate: 0
   PPBloom: 0
   BloomStrength: 0.5
   PPDoF: 0
@@ -31,11 +31,11 @@ MonoBehaviour:
   PPToneMap: 1
   PPTAA: 0
   RenderScale: 1
-  DenoiserMethod: 1
+  DenoiserMethod: 0
   UpscalerMethod: 0
   UseReSTIRGITemporal: 1
   UseReSTIRGISpatial: 1
-  UseReSTIRGI: 0
+  UseReSTIRGI: 1
   ReSTIRGITemporalMCap: 4
   DoReSTIRGIConnectionValidation: 1
   Exposure: 50
@@ -108,3 +108,4 @@ MonoBehaviour:
   PhotonGuidingRatio: 0.15
   PhotonGuidingPerLightGuidingResolution: 128
   PhotonGuidingTotalPhotonsPerFrame: 2000000
+  RadCacheToggle: 0

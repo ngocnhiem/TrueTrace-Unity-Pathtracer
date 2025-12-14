@@ -509,7 +509,7 @@ WeatherSample sampleWeather(const float2 uv, const float height, const float mip
   );
 
   float4 localWeather = pow(
-    localWeatherTexture.SampleLevel(my_linear_repeat_sampler, uv * localWeatherFrequency + (curframe / 120000.0f), mipLevel),
+    localWeatherTexture.SampleLevel(my_linear_repeat_sampler, uv * localWeatherFrequency + (frames_accumulated / 120000.0f), mipLevel),
     weatherExponents
   );
   float4 heightScale = shapeAlteringFunction(weather.heightFraction, 0.4);

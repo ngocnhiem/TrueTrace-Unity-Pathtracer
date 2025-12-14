@@ -60,12 +60,9 @@ int CurBounce;
 uint screen_width;
 uint screen_height;
 int frames_accumulated;
-int curframe;//might be able to get rid of this
 int MainDirectionalLight;
 float LEMEnergyScale;
 
-bool UseLightBVH;
-bool DiffRes;
 bool UseRussianRoulette;
 bool UseNEE;
 bool DoPartialRendering;
@@ -87,8 +84,9 @@ float focal_distance;
 float AperatureRadius;
 float3 MousePos;
 bool IsFocusing;
-float2 Segment;
+
 bool DoPanorama;
+float2 Segment;
 
 float ClayMetalOverrideValue;
 float ClayRoughnessOverrideValue;
@@ -139,7 +137,6 @@ bool DoExposure;
 StructuredBuffer<float> Exposure;
 
 
-
 RWTexture2DArray<uint4> ReservoirA;
 Texture2DArray<uint4> ReservoirB;
 
@@ -150,12 +147,15 @@ RWTexture2D<uint4> WorldPosC;
 RWTexture2D<half4> NEEPosA;
 Texture2D<half4> NEEPosB;
 
+
+Texture2D<float4> RandomNums;
+
+
+RWTexture2D<float4> _DebugTex;
 RWTexture2D<float4> Result;
-Texture2D<float> _AlphaAtlas;
 
 Texture2D<uint4> PrimaryTriData;
 Texture2D<uint4> PrimaryTriDataPrev;
-StructuredBuffer<int> TLASBVH8Indices;
 
 int AlbedoAtlasSize;
 struct TrianglePos {
@@ -193,15 +193,12 @@ SamplerState my_trilinear_repeat_sampler;
 SamplerState my_point_repeat_sampler;
 
 Texture2D<half> SingleComponentAtlas;
-Texture2D<float4> RandomNums;
-RWTexture2D<float4> _DebugTex;
-
+Texture2D<float> _AlphaAtlas;
 Texture2D<half4> _TextureAtlas;
-SamplerState sampler_TextureAtlas;
-Texture2D<half2> _NormalAtlas;
-SamplerState sampler_NormalAtlas;
 Texture2D<half4> _EmissiveAtlas;
 Texture2D<half> _IESAtlas;
+Texture2D<half2> _NormalAtlas;
+SamplerState sampler_NormalAtlas;
 
 Texture2D<half> Heightmap;
 Texture2D<float4> TerrainAlphaMap;
@@ -295,22 +292,22 @@ inline float4 SampleTexture(float2 UV, const int TextureType, const MaterialData
 	#if defined(DX11)
 		switch(TextureType) {
 			case SampleAlbedo: FinalCol = _TextureAtlas.SampleLevel(TTPrimarySampler, AlignUV(UV, MatTex.AlbedoTexScale, MatTex.AlbedoTex, MatTex.Rotation), 0); break;
-			case SampleMetallic: FinalCol = SingleComponentAtlas.SampleLevel(my_linear_clamp_sampler, AlignUV(UV, MatTex.SecondaryTexScaleOffset, MatTex.MetallicTex, MatTex.RotationSecondary), 0); break;
-			case SampleRoughness: FinalCol = SingleComponentAtlas.SampleLevel(my_linear_clamp_sampler, AlignUV(UV, MatTex.SecondaryTexScaleOffset, MatTex.RoughnessTex, MatTex.RotationSecondary), 0); break;
-			case SampleEmission: FinalCol = _EmissiveAtlas.SampleLevel(my_linear_clamp_sampler, AlignUV(UV, MatTex.AlbedoTexScale, MatTex.EmissiveTex, MatTex.Rotation), 0); break;
+			case SampleMetallic: FinalCol = SingleComponentAtlas.SampleLevel(TTPrimarySampler, AlignUV(UV, MatTex.SecondaryTexScaleOffset, MatTex.MetallicTex, MatTex.RotationSecondary), 0); break;
+			case SampleRoughness: FinalCol = SingleComponentAtlas.SampleLevel(TTPrimarySampler, AlignUV(UV, MatTex.SecondaryTexScaleOffset, MatTex.RoughnessTex, MatTex.RotationSecondary), 0); break;
+			case SampleEmission: FinalCol = _EmissiveAtlas.SampleLevel(TTPrimarySampler, AlignUV(UV, MatTex.AlbedoTexScale, MatTex.EmissiveTex, MatTex.Rotation), 0); break;
 			case SampleNormal: FinalCol = _NormalAtlas.SampleLevel(sampler_NormalAtlas, AlignUV(UV, MatTex.NormalTexScaleOffset, MatTex.NormalTex, MatTex.RotationNormal), 0).xyxy; break;
 			case SampleAlpha: FinalCol = _AlphaAtlas.SampleLevel(TTPrimarySampler, AlignUV(UV, MatTex.AlbedoTexScale, MatTex.AlphaTex, MatTex.Rotation), 0); break;
-			case SampleMatCap: FinalCol = _TextureAtlas.SampleLevel(my_linear_clamp_sampler, AlignUV(UV, MatTex.AlbedoTexScale, MatTex.MatCapTex, MatTex.Rotation), 0); break;
-			case SampleMatCapMask: FinalCol = _TextureAtlas.SampleLevel(my_linear_clamp_sampler, AlignUV(UV, MatTex.AlbedoTexScale, MatTex.MatCapMask, MatTex.Rotation), 0); break;
+			case SampleMatCap: FinalCol = _TextureAtlas.SampleLevel(TTPrimarySampler, AlignUV(UV, MatTex.AlbedoTexScale, MatTex.MatCapTex, MatTex.Rotation), 0); break;
+			case SampleMatCapMask: FinalCol = _TextureAtlas.SampleLevel(TTPrimarySampler, AlignUV(UV, MatTex.AlbedoTexScale, MatTex.MatCapMask, MatTex.Rotation), 0); break;
 			case SampleTerrainAlbedo: FinalCol = _TextureAtlas.SampleLevel(my_point_clamp_sampler, AlignUV(UV * MatTex.surfaceColor.xy + MatTex.transmittanceColor.xy, MatTex.AlbedoTexScale, MatTex.AlbedoTex), 0); break;
 			case SampleSecondaryAlbedo: FinalCol = _TextureAtlas.SampleLevel(TTPrimarySampler, AlignUV(UV, MatTex.SecondaryAlbedoTexScaleOffset, MatTex.SecondaryAlbedoTex, MatTex.RotationSecondaryDiffuse), 0); break;
-			case SampleSecondaryAlbedoMask: FinalCol = SingleComponentAtlas.SampleLevel(my_linear_clamp_sampler, AlignUV(UV, MatTex.AlbedoTexScale, MatTex.SecondaryAlbedoMask, MatTex.Rotation), 0); break;
+			case SampleSecondaryAlbedoMask: FinalCol = SingleComponentAtlas.SampleLevel(TTPrimarySampler, AlignUV(UV, MatTex.AlbedoTexScale, MatTex.SecondaryAlbedoMask, MatTex.Rotation), 0); break;
 			case SampleDetailNormal: FinalCol = _NormalAtlas.SampleLevel(sampler_NormalAtlas, AlignUV(UV, MatTex.SecondaryNormalTexScaleOffset, MatTex.SecondaryNormalTex, MatTex.RotationSecondaryNormal), 0).xyxy; break;
-			case SampleDiffTrans: FinalCol = SingleComponentAtlas.SampleLevel(my_linear_clamp_sampler, AlignUV(UV, MatTex.AlbedoTexScale, MatTex.DiffTransTex, MatTex.Rotation), 0); break;
+			case SampleDiffTrans: FinalCol = SingleComponentAtlas.SampleLevel(TTPrimarySampler, AlignUV(UV, MatTex.AlbedoTexScale, MatTex.DiffTransTex, MatTex.Rotation), 0); break;
 		}
 	#else//BINDLESS
 		//AlbedoTexScale, AlbedoTex, and Rotation dont worry about, thats just for transforming to the atlas 
-		int2 TextureIndexAndChannel = -1;// = MatTex.BindlessIndex;
+		int2 TextureIndexAndChannel = -1;
 		[branch]switch(TextureType) {
 			case SampleAlbedo: TextureIndexAndChannel = MatTex.AlbedoTex; HandleRotation(UV, MatTex.Rotation); UV = UV * MatTex.AlbedoTexScale.xy + MatTex.AlbedoTexScale.zw; break;
 			case SampleMetallic: TextureIndexAndChannel = MatTex.MetallicTex; HandleRotation(UV, MatTex.RotationSecondary); UV = UV * MatTex.SecondaryTexScaleOffset.xy + MatTex.SecondaryTexScaleOffset.zw; break;
@@ -343,69 +340,46 @@ inline float4 SampleTexture(float2 UV, const int TextureType, const MaterialData
 			FinalCol = (FinalCol.r >= 0.99f) ? FinalCol.agag : FinalCol.rgrg;
 
 		}
-
-
-
 	#endif
 	return FinalCol;
 }
 
 // ------- Compression/Decompression Functions --------
-uint packRGBE(float3 v)
-{
+inline uint packRGBE(const float3 v) {
 	float3 va = max(0, v);
 	float max_abs = max(va.r, max(va.g, va.b));
-	if (max_abs == 0) return 0;
-
-	float exponent = floor(log2(max_abs));
-
-	uint result = uint(clamp(exponent + 20, 0, 31)) << 27;
-
-	float scale = pow(2, -exponent) * 256.0;
-	uint3 vu = min(511, round(va * scale));
-	result |= vu.r;
-	result |= vu.g << 9;
-	result |= vu.b << 18;
-
-	return result;
+	[branch]if (max_abs == 0) return 0;
+	int exponent = (int)(log2(max_abs));
+	uint e = clamp(exponent + 20, 0, 31);
+	float scale = exp2(-exponent) * 256.0;
+	uint3 vu = (uint3)min(511.0f.xxx, round(va * scale));
+	return (e << 27) | (vu.r) | (vu.g << 9) | (vu.b << 18);
 }
 
-float3 unpackRGBE(uint x)
-{
-    int exponent = int(x >> 27) - 20;
-    float scale = pow(2, exponent) / 256.0;
-
-    float3 v;
-    v.r = float(x & 0x1ff) * scale;
-    v.g = float((x >> 9) & 0x1ff) * scale;
-    v.b = float((x >> 18) & 0x1ff) * scale;
-
-    return v;
+inline float3 unpackRGBE(const uint x) {
+    float scale = exp2((int)(x >> 27) - 20) * (1.0f / 256.0f);
+    uint r =  x        & 0x1FF;
+    uint g = (x >> 9 ) & 0x1FF;
+    uint b = (x >> 18) & 0x1FF;
+    return float3(r, g, b) * scale;
 }
-uint octahedral_32(float3 nor) {
-	float oct = 1.0f / (abs(nor.x) + abs(nor.y) + abs(nor.z));
+inline uint octahedral_32(float3 nor) {
+	float oct = rcp(abs(nor.x) + abs(nor.y) + abs(nor.z));
 	float t = saturate(-nor.z);
 	nor.xy = (nor.xy + (nor.xy > 0.0f ? t : -t)) * oct;
     uint2 d = uint2(round(32767.5 + nor.xy*32767.5));  
     return d.x|(d.y<<16u);
 }
 
-float3 i_octahedral_32( uint data ) {
+inline float3 i_octahedral_32(uint data ) {
     uint2 iv = uint2( data, data>>16u ) & 65535u; 
-    float2 v = iv/32767.5f - 1.0f;
+    float2 v = iv * (1.0f / 32767.5f) - 1.0f;
     float3 nor = float3(v, 1.0f - abs(v.x) - abs(v.y)); // Rune Stubbe's version,
     float t = max(-nor.z,0.0);                     // much faster than original
     nor.xy += (nor.xy>=0.0)?-t:t;                     // implementation of this
-    return normalize( nor );
+    return nor * rsqrt(dot(nor, nor));
 }
-// ------- Companion Functions End --------
-
-
-
-
-
-
-
+// ------- Compression/Decompression Functions End --------
 
 float3x3 GetTangentSpace(float3 normal) {
     // Choose a helper floattor for the cross product
@@ -425,8 +399,10 @@ float3x3 build_rotated_ONB(const float3 N, float basis_rotation)
     float3 up = abs(N.z) < 0.9999999f ? float3(0.0f, 0.0f, 1.0f) : float3(1.0f, 0.0f, 0.0f);
     float3 T = normalize(cross(up, N));
 
+    float basissin, basiscos;
+    sincos(basis_rotation, basissin, basiscos);
     // Rodrigues' rotation
-    T = T * cos(basis_rotation) + cross(N, T) * sin(basis_rotation) + N * dot(N, T) * (1.0f - cos(basis_rotation));
+    T = T * basiscos + cross(N, T) * basissin + N * dot(N, T) * (1.0f - basiscos);
     float3 B = cross(N, T);
     return float3x3(T, N, B);
 }
@@ -491,16 +467,16 @@ float2 randomNEE(uint samdim, uint pixel_index) {
 
 float2 random(uint samdim, uint pixel_index) {
 #ifdef PhotonMappingUsed
-			uint2 pixid = uint2(pixel_index % screen_width, pixel_index / screen_width);
-			uint hash = pcg_hash((pixel_index * (uint)526 + samdim) * (MaxBounce + 1) + PhotonBounce[pixel_index % 1024]);
+		uint2 pixid = uint2(pixel_index % screen_width, pixel_index / screen_width);
+		uint hash = pcg_hash((pixel_index * (uint)526 + samdim) * (MaxBounce + 1) + PhotonBounce[pixel_index % 1024]);
 
-			const static float one_over_max_unsigned = asfloat(0x2f7fffff);
+		const static float one_over_max_unsigned = asfloat(0x2f7fffff);
 
 
-			float x = hash_with(frames_accumulated, hash) * one_over_max_unsigned;
-			float y = hash_with(frames_accumulated + 0xdeadbeef, hash) * one_over_max_unsigned;
+		float x = hash_with(frames_accumulated, hash) * one_over_max_unsigned;
+		float y = hash_with(frames_accumulated + 0xdeadbeef, hash) * one_over_max_unsigned;
 
-			return float2(x, y);
+		return float2(x, y);
 #else
 	[branch] if (UseASVGF) {
 		uint2 pixid = uint2(pixel_index % screen_width, pixel_index / screen_width);
@@ -580,10 +556,9 @@ SmallerRay CreateCameraRay(float2 uv, uint pixel_index) {
 	float3 direction = mul(CamInvProj, float4(uv, 0.0f, 1.0f)).xyz;
 	// Transform the direction from camera to world space and normalize
 
-	if(!IsOrtho) {
+	[branch]if(!IsOrtho) {
 		direction = mul(CamToWorld, float4(direction, 0.0f)).xyz;
 		direction = normalize(direction);
-
 	} else {
 		float4x4 TruProj = inverse(CamInvProj);
 		float orthoWidth = 1.0f / TruProj._m00;
@@ -639,19 +614,6 @@ inline SmallerRay CreateCameraRay(float2 uv) {
     float3 direction = mul(CamInvProj, float4(uv, 0.0f, 1.0f)).xyz;
     // Transform the direction from camera to world space and normalize
     direction = mul(CamToWorld, float4(direction, 0.0f)).xyz;
-    direction = normalize(direction);
-
-    return CreateRay(origin, direction);
-}
-
-inline SmallerRay CreateCameraRayPrev(float2 uv) {
-    // Transform the camera origin to world space
-    float3 origin = mul(CamToWorldPrev, float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
-
-    // Invert the perspective projection of the view-space position
-    float3 direction = mul(CamInvProjPrev, float4(uv, 0.0f, 1.0f)).xyz;
-    // Transform the direction from camera to world space and normalize
-    direction = mul(CamToWorldPrev, float4(direction, 0.0f)).xyz;
     direction = normalize(direction);
 
     return CreateRay(origin, direction);
@@ -736,7 +698,7 @@ inline bool triangle_intersect_shadow(int tri_id, const SmallerRay ray, const fl
     }
     return false;
 }
-inline void triangle_intersect_dist(int tri_id, const SmallerRay ray, inout float max_distance, int mesh_id, const int MatOffset) {
+inline void triangle_intersect_dist(const int tri_id, const SmallerRay ray, inout float max_distance, const int MatOffset) {
     TrianglePos tri = triangle_get_positions(tri_id);
 
     float3 h = cross(ray.direction, tri.posedge2);
@@ -759,7 +721,7 @@ inline void triangle_intersect_dist(int tri_id, const SmallerRay ray, inout floa
 				if(GetFlag(_IntersectionMaterials[MaterialIndex].Tag, IsBackground) || GetFlag(_IntersectionMaterials[MaterialIndex].Tag, ShadowCaster)) return; 
         		[branch] if(_IntersectionMaterials[MaterialIndex].MatType == CutoutIndex) {
 	                float2 BaseUv = TriUVs.UV0 * (1.0f - u - v) + TriUVs.UV1 * u + TriUVs.UV2 * v;
-                    if(_IntersectionMaterials[MaterialIndex].MatType == CutoutIndex && _IntersectionMaterials[MaterialIndex].AlphaTex.x > 0) {
+                    if(_IntersectionMaterials[MaterialIndex].AlphaTex.x > 0) {
                     	float Alph = SampleTexture(BaseUv, SampleAlpha, _IntersectionMaterials[MaterialIndex]).x;
                         if((GetFlag(_IntersectionMaterials[MaterialIndex].Tag, InvertAlpha) ? (1.0f - Alph) : Alph) < _IntersectionMaterials[MaterialIndex].AlphaCutoff) return;
                     }
@@ -810,29 +772,20 @@ inline uint cwbvh_node_intersect(const SmallerRay ray, int oct_inv4, float max_d
     uint y_max = TempNode.nodes[3].y;
     uint z_min = TempNode.nodes[4].x;
     uint z_max = TempNode.nodes[4].y;
-    [branch]if(RayDirBools.x) {
-    	x_min ^= x_max; x_max ^= x_min; x_min ^= x_max;
-    }
-    [branch]if(RayDirBools.y) {
-    	y_min ^= y_max; y_max ^= y_min; y_min ^= y_max;
-    }
-    [branch]if(RayDirBools.z) {
-    	z_min ^= z_max; z_max ^= z_min; z_min ^= z_max;
-    }
+    uint meta4 = TempNode.nodes[1].z;
+    //XOR swaps
+    [branch]if(RayDirBools.x) {x_min ^= x_max; x_max ^= x_min; x_min ^= x_max;}
+    [branch]if(RayDirBools.y) {y_min ^= y_max; y_max ^= y_min; y_min ^= y_max;}
+    [branch]if(RayDirBools.z) {z_min ^= z_max; z_max ^= z_min; z_min ^= z_max;}
 
     [unroll]
     for(int i = 0; i < 2; i++) {
-        uint meta4 = (i == 0 ? TempNode.nodes[1].z : TempNode.nodes[1].w);
 
-        uint is_inner4   = (meta4 & (meta4 << 1)) & 0x10101010;
-        uint inner_mask4 = (is_inner4 >> 4) * 0xffu;
-        uint bit_index4  = (meta4 ^ (oct_inv4 & inner_mask4)) & 0x1f1f1f1f;
+        uint bit_index4  = (meta4 ^ (oct_inv4 & ((((meta4 & (meta4 << 1)) & 0x10101010) >> 4) * 0xffu))) & 0x1f1f1f1f;
         uint child_bits4 = (meta4 >> 5) & 0x07070707;
-
 
         [unroll]
         for(int j = 0; j < 4; j++) {
-
             tmin3 = float3(((x_min >> (j * 8)) & 0xffu), ((y_min >> (j * 8)) & 0xffu), ((z_min >> (j * 8)) & 0xffu));
             tmax3 = float3(((x_max >> (j * 8)) & 0xffu), ((y_max >> (j * 8)) & 0xffu), ((z_max >> (j * 8)) & 0xffu));
 
@@ -858,230 +811,122 @@ inline uint cwbvh_node_intersect(const SmallerRay ray, int oct_inv4, float max_d
 	        y_max = TempNode.nodes[3].w;
 	        z_min = TempNode.nodes[4].z;
 	        z_max = TempNode.nodes[4].w;
-
-	        [branch]if(RayDirBools.x) {
-	        	x_min ^= x_max; x_max ^= x_min; x_min ^= x_max;
-	        }
-	        [branch]if(RayDirBools.y) {
-	        	y_min ^= y_max; y_max ^= y_min; y_min ^= y_max;
-	        }
-	        [branch]if(RayDirBools.z) {
-	        	z_min ^= z_max; z_max ^= z_min; z_min ^= z_max;
-	        }
+    		meta4 = TempNode.nodes[1].w;
+		    //XOR swaps
+	        [branch]if(RayDirBools.x) {x_min ^= x_max; x_max ^= x_min; x_min ^= x_max;}
+	        [branch]if(RayDirBools.y) {y_min ^= y_max; y_max ^= y_min; y_min ^= y_max;}
+	        [branch]if(RayDirBools.z) {z_min ^= z_max; z_max ^= z_min; z_min ^= z_max;}
     	}
-
     }
     return hit_mask;
 }
 
+inline bool VisabilityCheckCompute(SmallerRay ray, inout float dist) {
+    uint2 stack[16];
+    int stack_size = 0;
+    uint2 current_group;
 
+    uint oct_inv4;
+    int tlas_stack_size = -1;
+    int mesh_id = -1;
+    SmallerRay ray2;
+    int TriOffset = 0;
+    int NodeOffset = 0;
 
-inline void Closest_Hit_Compute(SmallerRay ray, inout float MinDist) {
-        uint2 stack[16];
-        int stack_size = 0;
-        uint2 current_group;
+    ray2 = ray;
 
-        uint oct_inv4;
-        int tlas_stack_size = -1;
-        int mesh_id = -1;
-        SmallerRay ray2;
-        int TriOffset = 0;
-        int NodeOffset = 0;
+    oct_inv4 = ray_get_octant_inv4(ray.direction);
+#ifndef ReSTIRAdvancedValidation
+    float3 through = 0;
+#endif
+    current_group.x = (uint)0;
+    current_group.y = (uint)0x80000000;
+    int MatOffset = 0;
+    int Reps = 0;
+	uint2 triangle_group;
+    [loop] while (Reps < MaxTraversalSamples) {//Traverse Accelleration Structure(Compressed Wide Bounding Volume Hierarchy)            
+        [branch]if (current_group.y > 0x00FFFFFF) {
+            uint child_index_offset = firstbithigh(current_group.y);
+            
+            uint slot_index = (child_index_offset - 24) ^ (oct_inv4 & 0xff);
+            uint relative_index = countbits(current_group.y & ~(0xffffffff << slot_index));
+            uint child_node_index = current_group.x + relative_index;
+            const BVHNode8Data TempNode = cwbvh_nodes[child_node_index];
 
-        ray2 = ray;
+            current_group.y &= ~(1 << child_index_offset);
 
-        oct_inv4 = ray_get_octant_inv4(ray.direction);
+            if (current_group.y & 0xff000000) stack[stack_size++] = current_group;
 
-        current_group.x = (uint)0;
-        current_group.y = (uint)0x80000000;
-        int MatOffset = 0;
-        int Reps = 0;
-        [loop] while (Reps < MaxTraversalSamples) {//Traverse Accelleration Structure(Compressed Wide Bounding Volume Hierarchy)            
-        	uint2 triangle_group;
-            [branch]if (current_group.y > 0x00FFFFFF) {
-                uint child_index_offset = firstbithigh(current_group.y);
-                
-                uint slot_index = (child_index_offset - 24) ^ (oct_inv4 & 0xff);
-                uint relative_index = countbits(current_group.y & ~(0xffffffff << slot_index));
-                uint child_node_index = current_group.x + relative_index;
-                const BVHNode8Data TempNode = cwbvh_nodes[child_node_index];
+            current_group.x = (TempNode.nodes[1].x) + NodeOffset;
+            triangle_group.x = (TempNode.nodes[1].y) + TriOffset;
 
-                current_group.y &= ~(1 << child_index_offset);
+            uint hitmask = cwbvh_node_intersect(ray, oct_inv4, dist, TempNode);
 
+				current_group.y = (hitmask & 0xff000000) | ((TempNode.nodes[0].w >> 24) & 0xff);
+            triangle_group.y = (hitmask & 0x00ffffff);
+
+            Reps++;
+        } else {
+            triangle_group = current_group;
+            current_group = (uint2)0;
+        }
+
+        if(triangle_group.y != 0) {
+            [branch]if (tlas_stack_size == -1) {//Transfer from Top Level Accelleration Structure to Bottom Level Accelleration Structure
+                uint mesh_offset = firstbithigh(triangle_group.y);
+                triangle_group.y &= ~(1 << mesh_offset);
+                mesh_id = TLASBVH8Indices[triangle_group.x + mesh_offset];
+                NodeOffset = _MeshData[mesh_id].NodeOffset;
+                TriOffset = _MeshData[mesh_id].TriOffset;
+
+                if (triangle_group.y != 0) stack[stack_size++] = triangle_group;
                 if (current_group.y & 0xff000000) stack[stack_size++] = current_group;
 
-	            current_group.x = (TempNode.nodes[1].x) + NodeOffset;
-                triangle_group.x = (TempNode.nodes[1].y) + TriOffset;
+                tlas_stack_size = stack_size;
 
-                uint hitmask = cwbvh_node_intersect(ray, oct_inv4, MinDist, TempNode);
+                int root_index = (_MeshData[mesh_id].mesh_data_bvh_offsets & 0x7fffffff);
 
- 				current_group.y = (hitmask & 0xff000000) | ((TempNode.nodes[0].w >> 24) & 0xff);
-                triangle_group.y = (hitmask & 0x00ffffff);
+                MatOffset = _MeshData[mesh_id].MaterialOffset;
+                ray.direction = (mul((float3x3)_MeshData[mesh_id].W2L, ray.direction)).xyz;
+                ray.origin = (mul(_MeshData[mesh_id].W2L, float4(ray.origin, 1))).xyz;
 
-                Reps++;
+                oct_inv4 = ray_get_octant_inv4(ray.direction);
+
+                current_group.x = (uint)root_index;
+                current_group.y = (uint)0x80000000;
             } else {
-                triangle_group = current_group;
-                current_group = (uint2)0;
-            }
-
-            if(triangle_group.y != 0) {
-                [branch]if (tlas_stack_size == -1) {//Transfer from Top Level Accelleration Structure to Bottom Level Accelleration Structure
-                    uint mesh_offset = firstbithigh(triangle_group.y);
-                    triangle_group.y &= ~(1 << mesh_offset);
-                    mesh_id = TLASBVH8Indices[triangle_group.x + mesh_offset];
-                    NodeOffset = _MeshData[mesh_id].NodeOffset;
-                    TriOffset = _MeshData[mesh_id].TriOffset;
-
-                    if (triangle_group.y != 0) stack[stack_size++] = triangle_group;
-                    if (current_group.y & 0xff000000) stack[stack_size++] = current_group;
-
-                    tlas_stack_size = stack_size;
-
-                    int root_index = (_MeshData[mesh_id].mesh_data_bvh_offsets & 0x7fffffff);
-
-                    MatOffset = _MeshData[mesh_id].MaterialOffset;
-                    ray.direction = (mul((float3x3)_MeshData[mesh_id].W2L, ray.direction)).xyz;
-                    ray.origin = (mul(_MeshData[mesh_id].W2L, float4(ray.origin, 1))).xyz;
-
-                    oct_inv4 = ray_get_octant_inv4(ray.direction);
-
-                    current_group.x = (uint)root_index;
-                    current_group.y = (uint)0x80000000;
-                } else {
-					while (triangle_group.y != 0) {                        
-                        uint triangle_index = firstbithigh(triangle_group.y);
-                        triangle_group.y &= ~(1 << triangle_index);
-	                    triangle_intersect_dist(triangle_group.x + triangle_index, ray, MinDist, mesh_id, MatOffset);
-                    }
+				while (triangle_group.y != 0) {                        
+                    uint triangle_index = firstbithigh(triangle_group.y);
+                    triangle_group.y &= ~(1 << triangle_index);
+#ifdef ReSTIRAdvancedValidation
+                    triangle_intersect_dist(triangle_group.x + triangle_index, ray, dist, MatOffset);
+#else
+                    if(triangle_intersect_shadow(triangle_group.x + triangle_index, ray, dist, through, MatOffset)) return false;
+#endif
                 }
-            }
-
-            if ((current_group.y & 0xff000000) == 0) {
-                if (stack_size == 0) {//thread has finished traversing
-                    break;
-                }
-
-                if (stack_size == tlas_stack_size) {
-					NodeOffset = 0;
-                    TriOffset = 0;
-                    tlas_stack_size = -1;
-                    ray = ray2;
-                    oct_inv4 = ray_get_octant_inv4(ray.direction);
-                }
-                current_group = stack[--stack_size];
             }
         }
-        return;
-}
 
-
-inline bool VisabilityCheckCompute(SmallerRay ray, float dist) {
-        uint2 stack[16];
-        int stack_size = 0;
-        uint2 current_group;
-
-        uint oct_inv4;
-        int tlas_stack_size = -1;
-        int mesh_id = -1;
-        SmallerRay ray2;
-        int TriOffset = 0;
-        int NodeOffset = 0;
-
-        ray2 = ray;
-
-        oct_inv4 = ray_get_octant_inv4(ray.direction);
-
-        current_group.x = (uint)0;
-        current_group.y = (uint)0x80000000;
-        int MatOffset = 0;
-        int Reps = 0;
-        float3 through = 0;
-        [loop] while (Reps < MaxTraversalSamples) {//Traverse Accelleration Structure(Compressed Wide Bounding Volume Hierarchy)            
-        	uint2 triangle_group;
-            [branch]if (current_group.y & 0xff000000) {
-                uint child_index_offset = firstbithigh(current_group.y);
-                
-                uint slot_index = (child_index_offset - 24) ^ (oct_inv4 & 0xff);
-                uint relative_index = countbits(current_group.y & ~(0xffffffff << slot_index));
-                uint child_node_index = current_group.x + relative_index;
-                const BVHNode8Data TempNode = cwbvh_nodes[child_node_index];
-
-                current_group.y &= ~(1 << child_index_offset);
-
-                if (current_group.y & 0xff000000) stack[stack_size++] = current_group;
-
-	            current_group.x = (TempNode.nodes[1].x) + NodeOffset;
-                triangle_group.x = (TempNode.nodes[1].y) + TriOffset;
-                
-                uint hitmask = cwbvh_node_intersect(ray, oct_inv4, dist, TempNode);
-
- 				current_group.y = (hitmask & 0xff000000) | ((TempNode.nodes[0].w >> 24) & 0xff);
-                triangle_group.y = (hitmask & 0x00ffffff);
-
-                Reps++;
-            } else {
-                triangle_group = current_group;
-                current_group = (uint2)0;
+        if ((current_group.y & 0xff000000) == 0) {
+            if (stack_size == 0) {//thread has finished traversing
+                break;
             }
 
-            if(triangle_group.y != 0) {
-                [branch]if (tlas_stack_size == -1) {//Transfer from Top Level Accelleration Structure to Bottom Level Accelleration Structure
-                    uint mesh_offset = firstbithigh(triangle_group.y);
-                    triangle_group.y &= ~(1 << mesh_offset);
-                    mesh_id = TLASBVH8Indices[triangle_group.x + mesh_offset];
-                    NodeOffset = _MeshData[mesh_id].NodeOffset;
-                    TriOffset = _MeshData[mesh_id].TriOffset;
-
-                    if (triangle_group.y != 0) stack[stack_size++] = triangle_group;
-
-                    if (current_group.y & 0xff000000) stack[stack_size++] = current_group;
-
-                    tlas_stack_size = stack_size;
-
-                    int root_index = (_MeshData[mesh_id].mesh_data_bvh_offsets & 0x7fffffff);
-
-                    MatOffset = _MeshData[mesh_id].MaterialOffset;
-                    ray.direction = (mul((float3x3)_MeshData[mesh_id].W2L, ray.direction)).xyz;
-                    ray.origin = (mul(_MeshData[mesh_id].W2L, float4(ray.origin, 1))).xyz;
-
-                    oct_inv4 = ray_get_octant_inv4(ray.direction);
-
-                    current_group.x = (uint)root_index;
-                    current_group.y = (uint)0x80000000;
-                } else {
-					while (triangle_group.y != 0) {                        
-                        uint triangle_index = firstbithigh(triangle_group.y);
-                        triangle_group.y &= ~(1 << triangle_index);
-	                    if (triangle_intersect_shadow(triangle_group.x + triangle_index, ray, dist, through, MatOffset)) {
-							return false;
-	                    }
-                    }
-                }
+            if (stack_size == tlas_stack_size) {
+				NodeOffset = 0;
+                TriOffset = 0;
+                tlas_stack_size = -1;
+                ray = ray2;
+                oct_inv4 = ray_get_octant_inv4(ray.direction);
             }
-
-            if ((current_group.y & 0xff000000) == 0) {
-                if (stack_size == 0) {//thread has finished traversing
-                    break;
-                }
-
-                if (stack_size == tlas_stack_size) {
-					NodeOffset = 0;
-                    TriOffset = 0;
-                    tlas_stack_size = -1;
-                    ray = ray2;
-                    oct_inv4 = ray_get_octant_inv4(ray.direction);
-                }
-                current_group = stack[--stack_size];
-            }
+            current_group = stack[--stack_size];
         }
-        return true;
+    }
+    return true;
 }
 
-
-
-
-float2 sample_triangle(float u1, float u2) {
-	if (u2 > u1) {
+inline float2 sample_triangle(float u1, float u2) {
+	[branch] if (u2 > u1) {
 		u1 *= 0.5f;
 		u2 -= u1;
 	} else {
@@ -1091,13 +936,9 @@ float2 sample_triangle(float u1, float u2) {
 	return float2(u1, u2);
 }
 
-
-
 inline float power_heuristic(float pdf_f, float pdf_g) {
     return (pdf_f * pdf_f) / (pdf_f * pdf_f + pdf_g * pdf_g); // Power of 2 hardcoded, best empirical results according to Veach
 }
-
-
 
 int RISCount;
 
@@ -1105,31 +946,28 @@ int SelectLightMeshSmart(uint pixel_index, inout float MeshWeight, float3 Pos) {
 
  	int MinIndex = 0;
     float wsum = 0;
-    int M = 0;
     float MinP_Hat = 0;
     float p_hat;
-    const int RISFinal = RISCount + 1;
-    for(int i = 0; i < RISFinal; i++) {
+    for(int i = 0; i <= RISCount; i++) {
         float2 Rand = random(i + 11, pixel_index);
         int Index = clamp((Rand.x * LightMeshCount), 0, LightMeshCount - 1);
         p_hat = 1.0f / dot(Pos - _LightMeshes[Index].Center, Pos - _LightMeshes[Index].Center);
         wsum += p_hat;
-        M++;
         if(Rand.y < p_hat / wsum) {
             MinIndex = Index;
             MinP_Hat = p_hat;
         }
     }
-    MeshWeight *= (wsum / max((RISFinal) * MinP_Hat, 0.000001f));
+    MeshWeight *= (wsum / max((RISCount+1) * MinP_Hat, 0.000001f));
     return MinIndex;
 }
 
 
-float3 ToWorld(float3x3 X, float3 V) {
-	return normalize(mul(V, X));//V.x * + StartIndex X + V.y * StartIndex + IndexEnd.z * Z;
+inline float3 ToWorld(float3x3 X, float3 V) {
+	return normalize(mul(V, X));
 }
 
-float3 ToLocal(float3x3 X, float3 V) {
+inline float3 ToLocal(float3x3 X, float3 V) {
 	return normalize(mul(X, V));
 }
 
@@ -1139,7 +977,6 @@ float SecondarySkyDesaturate;
 
 float3 SunDir;
 
-
 inline float luminance(const float3 a) {
     return dot(float3(0.299f, 0.587f, 0.114f), max(a,0));
 }
@@ -1148,27 +985,26 @@ inline float lum2(const float3 a) {
     return dot(float3(0.21f, 0.72f, 0.07f), max(a,0));
 }
 
-
-float3x3 adjoint(float4x4 m)
-{
+float3x3 adjoint(float4x4 m) {
     return float3x3(cross(m[1].xyz, m[2].xyz), 
                 cross(m[2].xyz, m[0].xyz), 
                 cross(m[0].xyz, m[1].xyz));
-
 }
 
 inline float3 GetTriangleNormal(const uint TriIndex, const float2 TriUV, const float3x3 Inverse) {
     float3 Normal0 = i_octahedral_32(AggTrisB[TriIndex].norms.x);
     float3 Normal1 = i_octahedral_32(AggTrisB[TriIndex].norms.y);
     float3 Normal2 = i_octahedral_32(AggTrisB[TriIndex].norms.z);
-    return normalize(mul(Inverse, (Normal0 * (1.0f - TriUV.x - TriUV.y) + TriUV.x * Normal1 + TriUV.y * Normal2)).xyz);
+    Normal0 = mul(Inverse, (Normal0 * (1.0f - TriUV.x - TriUV.y) + TriUV.x * Normal1 + TriUV.y * Normal2)).xyz;
+    return Normal0 * rsqrt(dot(Normal0, Normal0));
 }
 
 inline float3 GetTriangleTangent(const uint TriIndex, const float2 TriUV, const float3x3 Inverse) {
     float3 Normal0 = i_octahedral_32(AggTrisB[TriIndex].tans.x);
     float3 Normal1 = i_octahedral_32(AggTrisB[TriIndex].tans.y);
     float3 Normal2 = i_octahedral_32(AggTrisB[TriIndex].tans.z);
-    return normalize(mul(Inverse, (Normal0 * (1.0f - TriUV.x - TriUV.y) + TriUV.x * Normal1 + TriUV.y * Normal2)).xyz);
+    Normal0 = mul(Inverse, (Normal0 * (1.0f - TriUV.x - TriUV.y) + TriUV.x * Normal1 + TriUV.y * Normal2));
+    return Normal0 * rsqrt(dot(Normal0, Normal0));
 }
 
 inline float GetHeightRaw(float3 CurrentPos, const TerrainData Terrain) {
@@ -1180,7 +1016,7 @@ inline float GetHeightRaw(float3 CurrentPos, const TerrainData Terrain) {
     return h;
 }
 
-inline float3 GetHeightmapNormal(float3 Position, uint TerrainID) {
+inline float3 GetHeightmapNormal(const float3 Position, const uint TerrainID) {
 	TerrainData CurrentTerrain = Terrains[TerrainID];
 	static const float2 Offset = float2(0.25f,0);
 	float3 Center = float3(Position.x, GetHeightRaw(Position, CurrentTerrain), Position.z);
@@ -1188,8 +1024,6 @@ inline float3 GetHeightmapNormal(float3 Position, uint TerrainID) {
 	float3 OffY = float3(Position.x, GetHeightRaw(Position + Offset.yyx, CurrentTerrain), Position.z + Offset.x);
 	return normalize(cross(normalize(OffX - Center), normalize(OffY - Center)));
 }
-
-
 
 inline float AreaOfTriangle(float3 pt1, float3 pt2, float3 pt3) {
     float a = distance(pt1, pt2);
@@ -1199,14 +1033,9 @@ inline float AreaOfTriangle(float3 pt1, float3 pt2, float3 pt3) {
     return sqrt(s * (s - a) * (s - b) * (s - c));
 }
 
-static const float FLT_EPSILON = 1.192092896e-07f;
-static const float FLT_MIN = 1.175494351e-38f;
-
-
 inline float mulsign(const float x, const float y) {
 	return asfloat((asuint(y) & 0x80000000) ^ asuint(x));
 }
-
 
 struct SGLobe {
 	float3 axis ;
@@ -1214,30 +1043,21 @@ struct SGLobe {
 	float logAmplitude ;
 };
 
-inline SGLobe sg_product ( float3 axis1 , float sharpness1 , float3 axis2 , float sharpness2 ) {
+inline SGLobe sg_product(const float3 axis1, const float sharpness1, const float3 axis2, const float sharpness2 ) {
 	float3 axis = axis1 * sharpness1 + axis2 * sharpness2 ;
 	float sharpness = length ( axis ) ;
 
-	float3 d = axis1 - axis2;
-	float len2 = dot(d, d);
-	float logAmplitude = -sharpness1 * sharpness2 * len2 / max(sharpness + sharpness1 + sharpness2, FLT_MIN);
-	SGLobe result = { axis / max( sharpness , FLT_MIN ) , sharpness , logAmplitude };
+	float len2 = dot(axis1 - axis2, axis1 - axis2);
+	float logAmplitude = -sharpness1 * sharpness2 * len2 / max(sharpness + sharpness1 + sharpness2, 1.175494351e-38f);
+	SGLobe result = { axis / max( sharpness , 1.175494351e-38f ) , sharpness , logAmplitude };
 	return result ;
 }
 
-#define FLT_MAX 3.402823466e+38f
-
 inline float expm1_over_x(const float x) {
 	const float u = exp(x);
-
-	[branch]if (u == 1.0)
-		return 1.0;
-
+	[branch]if (u == 1.0) return 1.0;
 	const float y = u - 1.0;
-
-	[branch]if (abs(x) < 1.0)
-		return y * rcp(log(u));
-
+	[branch]if (abs(x) < 1.0) return y * rcp(log(u));
 	return y * rcp(x);
 }
 
@@ -1258,8 +1078,6 @@ inline float SGClampedCosineProductIntegralOverPi2024(const float cosine, const 
 	// Therefore, unlike the original impelemntation [Tokuyoshi et al. 2024], we clamp the lerp factor with the machine epsilon / 2 for a conservative approximation.
 	// This clamping is unnecessary for languages that have a precise erfc function (e.g., C++).
 	// The original implementation [Tokuyoshi et al. 2024] uses a precise erfc function and does not clamp the lerp factor.
-	const float INV_SQRTPI = 0.56418958354775628694807945156077f; // = 1/sqrt(pi).
-	const float CLAMPING_THRESHOLD = 0.5 * FLT_EPSILON; // Set zero if a precise erfc function is available.
 	
 	float ERFCTZ = 1.0f;
 	float ERFCT = 1.0f;
@@ -1303,14 +1121,14 @@ inline float SGClampedCosineProductIntegralOverPi2024(const float cosine, const 
 	}
 
 
-	const float lerpFactor = saturate(max(0.5f * (cosine * ERFCTZ + ERFCT) - 0.5f * INV_SQRTPI * exp(-tz * tz) * expm1(t * t * (cosine * cosine - 1.0)) * rcp(t), CLAMPING_THRESHOLD));
+	const float lerpFactor = saturate(max(0.5f * (cosine * ERFCTZ + ERFCT) - 0.5f * 0.56418958354775628694807945156077f * exp(-tz * tz) * expm1(t * t * (cosine * cosine - 1.0)) * rcp(t), 0.5f * 1.192092896e-07f));
 
 	const float negsharp = expm1_over_x(-sharpness);
 	const float e = exp(-sharpness);
 	const float lowerIntegral = e * (negsharp - e) / sharpness;
 	const float upperIntegral = (1.0f - negsharp) / sharpness;
 
-	return 2.0 * lerp(lowerIntegral, upperIntegral, lerpFactor);
+	return 2.0f * lerp(lowerIntegral, upperIntegral, lerpFactor);
 }
 
 
@@ -1320,21 +1138,17 @@ inline float SGGX(const float3 m, const float2x2 roughnessMat) {
 	const float2x2 roughnessMatAdj = { roughnessMat._22, -roughnessMat._12, -roughnessMat._21, roughnessMat._11 };
 	const float length2 = dot(m.xz, mul(roughnessMatAdj, m.xz)) / det + m.y * m.y; // TODO: Use Kahan's algorithm for precise mul and dot. [https://pharr.org/matt/blog/2019/11/03/difference-of-floatshttps://pharr.org/matt/blog/2019/11/03/difference-of-floats]
 
-	return 1.0 / (PI * sqrt(det) * (length2 * length2));
+	return 1.0f / (PI * sqrt(det) * (length2 * length2));
 }
 
 // Reflection lobe based the symmetric GGX VNDF.
 // [Tokuyoshi et al. 2024 "Hierarchical Light Sampling with Accurate Spherical Gaussian Lighting", Section 5.2]
 inline float SGGXReflectionPDF(const float3 wi, const float3 m, const float2x2 roughnessMat) {
-	return SGGX(m, roughnessMat) * rcp(max(4.0 * sqrt(dot(wi.xz, mul(roughnessMat, wi.xz)) + wi.y * wi.y), EPSILON)); // TODO: Use Kahan's algorithm for precise mul and dot. [https://pharr.org/matt/blog/2019/11/03/difference-of-floats]
+	return SGGX(m, roughnessMat) * rcp(max(4.0f * sqrt(dot(wi.xz, mul(roughnessMat, wi.xz)) + wi.y * wi.y), EPSILON)); // TODO: Use Kahan's algorithm for precise mul and dot. [https://pharr.org/matt/blog/2019/11/03/difference-of-floats]
 }
 
 inline float SGIntegral(const float sharpness) {
-	return 4.0 * PI * expm1_over_x(-2.0 * sharpness);
-}
-
-bool IsFinite(float x) {
-    return (asuint(x) & 0x7F800000) != 0x7F800000;
+	return 4.0f * PI * expm1_over_x(-2.0f * sharpness);
 }
 
 float SGImportanceDiffuse(const GaussianTreeNode TargetNode, const float3 p, const float3 n) {
@@ -1344,7 +1158,7 @@ float SGImportanceDiffuse(const GaussianTreeNode TargetNode, const float3 p, con
 	to_light *= rsqrt(squareddist);
 	const float c = max(dot(n, -(to_light)),0);
 
-	float Variance = max(TargetNode.variance, (0.00001f) * squareddist);// * (1.0f - c) + 0.5f * (TargetNode.radius * TargetNode.radius) * c;
+	float Variance = max(TargetNode.variance, (0.00001f) * squareddist);
 	Variance = Variance * (1.0f - c) + 0.5f * (TargetNode.radius * TargetNode.radius) * c;
 
 	const SGLobe LightLobe = sg_product(i_octahedral_32(TargetNode.axis), TargetNode.sharpness, to_light, squareddist / Variance);
@@ -1362,9 +1176,9 @@ float SGImportance(const GaussianTreeNode TargetNode, const float3 viewDirTS, co
 	const float squareddist = dot(to_light, to_light);
 
 	to_light *= rsqrt(squareddist);
-	const float c = max(dot(n, -(to_light)),0);
+	const float c = max(dot(n, -to_light),0);
 
-	float Variance = max(TargetNode.variance, (0.00001f) * squareddist);// * (1.0f - c) + 0.5f * (TargetNode.radius * TargetNode.radius) * c;
+	float Variance = max(TargetNode.variance, (0.00001f) * squareddist);
 	Variance = Variance * (1.0f - c) + 0.5f * (TargetNode.radius * TargetNode.radius) * c;
 
 	const SGLobe LightLobe = sg_product(i_octahedral_32(TargetNode.axis), TargetNode.sharpness, to_light, squareddist / Variance);
@@ -1372,14 +1186,14 @@ float SGImportance(const GaussianTreeNode TargetNode, const float3 viewDirTS, co
 	const float emissive = (TargetNode.intensity) / (Variance * SGIntegral(TargetNode.sharpness));
 
 	const float amplitude = exp(LightLobe.logAmplitude);
-	const float cosine = (dot(LightLobe.axis, n));
+	const float cosine = dot(LightLobe.axis, n);
 	const float diffuseIllumination = amplitude * SGClampedCosineProductIntegralOverPi2024(cosine, LightLobe.sharpness);
 	[branch]if(metallic > 0.001f) {
 		const float LightLobeVariance = rcp(LightLobe.sharpness);
 		const float2x2 filteredProjRoughnessMat = float2x2(projRoughness2.x, 0.0, 0.0, projRoughness2.y) + 2.0 * LightLobeVariance * jjMat;
 		const float det = projRoughness2.x * projRoughness2.y + 2.0 * LightLobeVariance * (projRoughness2.x * jjMat._11 + projRoughness2.y * jjMat._22) + LightLobeVariance * LightLobeVariance * detJJ4;
 		const float tr = filteredProjRoughnessMat._11 + filteredProjRoughnessMat._22;
-		const float2x2 filteredRoughnessMat = min(filteredProjRoughnessMat + float2x2(det, 0.0, 0.0, det), FLT_MAX) * rcp(1.0 + tr + det);//IsFinite(1.0 + tr + det) ? min(filteredProjRoughnessMat + float2x2(det, 0.0, 0.0, det), FLT_MAX) / (1.0 + tr + det) : (float2x2(min(filteredProjRoughnessMat._11, FLT_MAX) / min(filteredProjRoughnessMat._11 + 1.0, FLT_MAX), 0.0, 0.0, min(filteredProjRoughnessMat._22, FLT_MAX) / min(filteredProjRoughnessMat._22 + 1.0, FLT_MAX)));
+		const float2x2 filteredRoughnessMat = min(filteredProjRoughnessMat + float2x2(det, 0.0, 0.0, det), 3.402823466e+38f) * rcp(1.0 + tr + det);
 		const float3 halfvecUnormalized = viewDirTS + mul(tangentFrame, LightLobe.axis);
 		const float3 halfvec = halfvecUnormalized * rsqrt(max(dot(halfvecUnormalized, halfvecUnormalized), EPSILON));
 		float pdf = SGGXReflectionPDF(viewDirTS, halfvec, filteredRoughnessMat);
@@ -1391,51 +1205,47 @@ float SGImportance(const GaussianTreeNode TargetNode, const float3 viewDirTS, co
 
 
 
-inline float cosSubClamped(float sinTheta_a, float cosTheta_a, float sinTheta_b, float cosTheta_b) {
+inline float cosSubClamped(float sinTheta_a, float cosTheta_a, float cosTheta_b) {
 	if(cosTheta_a > cosTheta_b) return 1;
-	return cosTheta_a * cosTheta_b + sinTheta_a * sinTheta_b;
+	return cosTheta_a * cosTheta_b + sinTheta_a;
 }
 inline float sinSubClamped(float sinTheta_a, float cosTheta_a, float sinTheta_b, float cosTheta_b) {
 	if(cosTheta_a > cosTheta_b) return 0;
 	return sinTheta_a * cosTheta_b - cosTheta_a * sinTheta_b;
 }
 
-float Importance(const float3 p, const float3 n, LightBVHData node)
-{//Taken straight from pbrt
+float Importance(const float3 p, const float3 n, LightBVHData node) {//Taken straight from pbrt
 	float cosTheta_o = (2.0f * ((float)(node.cosTheta_oe & 0x0000FFFF) / 32767.0f) - 1.0f);
-    float3 pc = (node.BBMax + node.BBMin) / 2.0f;
+    float3 pc = (node.BBMax + node.BBMin) * 0.5f;
     float pDiff = dot(p - pc, p - pc);
-    float d2 = max(pDiff, length(node.BBMax - node.BBMin) / 2.0f);
+    float d2 = max(pDiff, length(node.BBMax - node.BBMin) * 0.5f);
 
-    float3 wi = (pc - p) / sqrt(pDiff);
+    float3 wi = (pc - p) * rsqrt(pDiff);
     float cosTheta_w = abs(dot(i_octahedral_32(node.w), wi));
     float sinTheta_w = sqrt(max(1.0f - cosTheta_w * cosTheta_w, 0));
 
     float cosTheta_b;
     {
         float radius = (all(pc >= node.BBMin) && all(pc <= node.BBMax)) ? dot(node.BBMax - pc, node.BBMax - pc) : 0;
-        if (pDiff < radius)
-            cosTheta_b = -1.0f;
-        else
-            cosTheta_b = sqrt(max(1.0f - radius / pDiff, 0));
+        if (pDiff < radius) cosTheta_b = -1.0f;
+        else cosTheta_b = sqrt(max(1.0f - radius / pDiff, 0));
     }
     float sinTheta_b = sqrt(max(1.0f - cosTheta_b * cosTheta_b, 0));
 
     float sinTheta_o = sqrt(max(1.0f - cosTheta_o * cosTheta_o, 0));
-    float cosTheta_x = cosSubClamped(sinTheta_w, cosTheta_w, sinTheta_o, cosTheta_o);
-    float sinTheta_x = sinSubClamped(sinTheta_w, cosTheta_w, sinTheta_o, cosTheta_o);
-    float cosThetap = cosSubClamped(sinTheta_x, cosTheta_x, sinTheta_b, cosTheta_b);
-    if (cosThetap <= (2.0f * ((float)(node.cosTheta_oe >> 16) / 32767.0f) - 1.0f))
-        return 0;
+    float cosTheta_x = cosSubClamped(sinTheta_w * sinTheta_o, cosTheta_w, cosTheta_o);//These can all maybe be optimized by precomputing sinTheta_a with sinTheta_b and such
+    float sinTheta_x = sinSubClamped(sinTheta_w, cosTheta_w, sinTheta_o, cosTheta_o) * sinTheta_b;
+    float cosThetap = cosSubClamped(sinTheta_x, cosTheta_x, cosTheta_b);
+    if (cosThetap <= (2.0f * ((float)(node.cosTheta_oe >> 16) / 32767.0f) - 1.0f)) return 0;
 
-    float importance = node.phi * cosThetap / d2;
+    float importance = node.phi * cosThetap * rcp(d2);
 
-    float cosTheta_i = (dot(wi, n));
+    float cosTheta_i = dot(wi, n);
     float sinTheta_i = sqrt(max(1.0f - cosTheta_i * cosTheta_i, 0));
-    float cosThetap_i = cosSubClamped(sinTheta_i, cosTheta_i, sinTheta_b, cosTheta_b);
+    float cosThetap_i = cosSubClamped(sinTheta_i * sinTheta_b, cosTheta_i, cosTheta_b);
     importance *= cosThetap_i;
 
-    return max(importance, 0.f); // / (float) max(node.LightCount, 1);
+    return max(importance, 0.f);
 }
 
 #ifdef UseSGTree
@@ -1447,13 +1257,10 @@ int CalcInside(LightBVHData A, LightBVHData B, float3 p, int Index) {
 	bool Residency0 = all(p <= A.BBMax) && all(p >= A.BBMin);
 	bool Residency1 = all(p <= B.BBMax) && all(p >= B.BBMin);
 #endif
-	if(Residency0 && Residency1) {
-		return Index + 2;
-	} else if(Residency0) {
-		return 0;
-	} else if(Residency1) {
-		return 1;
-	} else return -1;
+	if(Residency0 && Residency1) return Index + 2;
+	else if(Residency0) return 0;
+	else if(Residency1) return 1;
+	else return -1;
 }
 
 #ifdef UseSGTree
@@ -1468,7 +1275,6 @@ void CalcLightPDF(inout float lightPDF, float3 p, float3 p2, float3 n, const int
 	int stacksize = 0;
 	float RandNum = random(264, pixel_index).x;
 	
-
 #ifdef UseSGTree
 	GaussianTreeNode node = SGTree[node_index];
 #else
@@ -1622,18 +1428,13 @@ int SampleLightBVH(float3 p, float3 n, inout float pmf, const int pixel_index, i
 	        float prob = (Index == 0) ? prob0 : (1.0f - prob0);
 	        pmf /= prob;
 
-	        if (Index == 0) {
-	            RandNum /= prob0;
-	        } else {
-	            RandNum = (RandNum - prob0) / (1.0f - prob0);
-	        }
+	        if (Index == 0) RandNum /= prob0;
+	        else RandNum = (RandNum - prob0) / (1.0f - prob0);
 	        RandNum = min(RandNum, 1.0f - 1e-6f);
 
 	        node_index = node.left + Index + NodeOffset;
 			if(Index) node = NodeB;
 			else node = NodeA;
-
-
 		} else {
 			[branch]if(HasHitTLAS) {
 				return -(node.left+1) + StartIndex;	
@@ -1674,7 +1475,7 @@ float3 LoadSurfaceInfoCurrentInPrev2(int2 id) {
     float2 TriUV;
     TriUV.x = asfloat(Target.z);
     TriUV.y = asfloat(Target.w);
-    if(Mesh.SkinnedOffset == -1) {
+    [branch] if(Mesh.SkinnedOffset == -1) {
 	    Target.y += Mesh.TriOffset;
 	    return mul(Inverse, float4(AggTrisA[Target.y].pos0 + TriUV.x * AggTrisA[Target.y].posedge1 + TriUV.y * AggTrisA[Target.y].posedge2,1)).xyz;
 	} else {
@@ -1691,7 +1492,7 @@ inline float3 LoadSurfaceInfoPrev2(int2 id) {
     TriUV.x = asfloat(Target.z);
     TriUV.y = asfloat(Target.w);
     float4x4 Inverse = inverse(Mesh.W2L);
-    if(Mesh.SkinnedOffset == -1) {
+    [branch] if(Mesh.SkinnedOffset == -1) {
 	    Target.y += Mesh.TriOffset;
 	    return mul(Inverse, float4(AggTrisA[Target.y].pos0 + TriUV.x * AggTrisA[Target.y].posedge1 + TriUV.y * AggTrisA[Target.y].posedge2,1)).xyz;
 	} else {
@@ -1736,36 +1537,31 @@ void Unity_Hue_Degrees_float(float3 In, float Offset, out float3 Out) {
     float3 hsv = float3(abs(Q.z + (Q.w - Q.y)/(6.0 * D + E)), D / (Q.x + E), V);
 
     float hue = hsv.x + Offset / 360;
-    hsv.x = (hue < 0)
-            ? hue + 1
-            : (hue > 1)
-                ? hue - 1
-                : hue;
-
+    hsv.x = (hue < 0) ? hue + 1 : (hue > 1) ? hue - 1 : hue;
     // HSV to RGB
-    float4 K2 = float4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+    const float4 K2 = float4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
     float3 P2 = abs(frac(hsv.xxx + K2.xyz) * 6.0 - K2.www);
     Out = hsv.z * lerp(K2.xxx, saturate(P2 - K2.xxx), hsv.y);
 }
 
 void Unity_Saturation_float(float3 In, float Saturation, out float3 Out) {
-    float luma = dot(In, float3(0.2126729, 0.7151522, 0.0721750));
+    float luma = dot(In, float3(0.2126729f, 0.7151522f, 0.0721750f));
     Out =  luma.xxx + Saturation.xxx * (In - luma.xxx);
 }
 
 void Unity_Contrast_float(inout float3 A, float Contrast) {
-    float midpoint = pow(0.5, 2.2);
+    const float midpoint = pow(0.5f, 2.2f);
     A =  (A - midpoint) * Contrast + midpoint;
 }
 
 float3 DeSat(float3 In, float Saturation) {
-    float luma = dot(In, float3(0.2126729, 0.7151522, 0.0721750));
+    float luma = dot(In, float3(0.2126729f, 0.7151522f, 0.0721750f));
     return  luma.xxx + Saturation.xxx * (In - luma.xxx);
 }
 
 
 
-float3 toSpherical(float3 p) {
+inline float3 toSpherical(const float3 p) {
   float r   = length(p);
   float t   = acos(p.z/r);
   float ph  = atan(p.y / p.x);
@@ -1773,7 +1569,7 @@ float3 toSpherical(float3 p) {
 }
 
 // License: Unknown, author: Unknown, found: don't remember
-float tanh_approx(float x) {
+inline float tanh_approx(float x) {
   //  Found this somewhere on the interwebs
   //  return tanh(x);
   float x2 = x*x;
@@ -1781,20 +1577,20 @@ float tanh_approx(float x) {
 }
 
 // License: MIT OR CC-BY-NC-4.0, author: mercury, found: https://mercury.sexy/hg_sdf/
-float2 mod2(inout float2 p, float2 size) {
+inline float2 mod2(inout float2 p, float2 size) {
   float2 c = floor((p + size*0.5)/size);
   p = fmod(p + size*0.5,size) - size*0.5;
   return c;
 }
 
 // License: Unknown, author: Unknown, found: don't remember
-float2 hash2(float2 p) {
+inline float2 hash2(float2 p) {
   p = float2(dot (p, float2 (127.1, 311.7)), dot (p, float2 (269.5, 183.3)));
   return frac(sin(p)*43758.5453123);
 }
 
 // License: CC BY-NC-SA 3.0, author: Stephane Cuillerdier - Aiekick/2015 (twitter:@aiekick), found: https://www.shadertoy.com/view/Mt3GW2
-float3 blackbody(float Temp) {
+inline float3 blackbody(float Temp) {
   float3 col = 255;
   col.x = 56100000. * pow(Temp,(-3. / 2.)) + 148.;
   col.y = 100.04 * log(Temp) - 623.6;
@@ -1805,12 +1601,12 @@ float3 blackbody(float Temp) {
   return col;
 }
 
-float3 stars(float3 ro, float3 rd, float2 sp, float hh) {
+inline float3 stars(float3 ro, float3 rd, float2 sp, float hh) {
   float3 col = 0;
   
   hh = tanh_approx(20.0*hh);
 
-  for (float i = 0.0; i < 5; ++i) {
+  [unroll]for (float i = 0.0; i < 5; ++i) {
     float2 pp = sp+0.5*i;
     float s = i/(4.0);
     float2 dim  = (lerp(0.05, 0.003, s)*PI);
@@ -1838,11 +1634,11 @@ float3 stars(float3 ro, float3 rd, float2 sp, float hh) {
 StructuredBuffer<float> TotSum;
 float2 HDRIParams;
 
-float3 equirectUvToDirection(float2 uv) {
-    uv.x -= 0.5;
-    uv.y = 1.0 - uv.y;
+inline float3 equirectUvToDirection(float2 uv) {
+    uv.x -= 0.5f;
+    uv.y = 1.0f - uv.y;
 
-    float theta = uv.x * 2.0 * PI;
+    float theta = uv.x * 2.0f * PI;
     float phi = uv.y * PI;
     float sinPhi, sinTheta;
     sincos(phi, sinPhi, phi);
@@ -1851,30 +1647,26 @@ float3 equirectUvToDirection(float2 uv) {
     return -float3(sinPhi * theta, phi, sinPhi * sinTheta);
 }
 
-float2 equirectDirectionToUv(float3 direction) {
+inline float2 equirectDirectionToUv(const float3 direction) {
     float2 uv = float2(atan2(direction.z, direction.x), acos(direction.y));
-    uv /= float2(2.0 * PI, PI);
-
-    uv.x += 0.5;
-    uv.y = 1.0 - uv.y;
+    uv *= rcp(float2(2.0f * PI, PI));
+    uv.x += 0.5f;
+    uv.y = 1.0f - uv.y;
     return uv;
 }
 
-float equirectDirectionPdf(float3 direction) {
+inline float equirectDirectionPdf(const float3 direction) {
     float2 uv = equirectDirectionToUv(direction);
-    float theta = uv.y * PI;
-    float sinTheta = sin( theta );
-    if (sinTheta == 0.0)
-        return 0.0;
-
-    return 1.0 / (2.0 * PI * PI * sinTheta);
+    float sinTheta = sin(uv.y * PI);
+    if (sinTheta == 0.0f) return 0.0f;
+    return rcp(2.0f * PI * PI * sinTheta);
 }
 
 Texture2D<float> CDFX;
 Texture2D<float> CDFY;
 Texture2D<float4> _SkyboxTexture;
 SamplerState sampler_SkyboxTexture;
-int FindInterval(int size, float u, Texture2D<float> CDF, int v = 0) {
+inline int FindInterval(int size, float u, Texture2D<float> CDF, int v = 0) {
     int first = 0, len = size;
     while (len > 0) {
         int hal = len >> 1, middle = first + hal;
@@ -1889,7 +1681,7 @@ int FindInterval(int size, float u, Texture2D<float> CDF, int v = 0) {
 }
 float2 HDRILongLat;
 float2 HDRIScale;
-float3 SampleLI(int pixel_index, inout float pdf, inout float3 wi) {
+inline float3 SampleLI(int pixel_index, inout float pdf, inout float3 wi) {
     float2 Rand = random(94, pixel_index);
     float2 uv;
     int v, offset;
@@ -1898,8 +1690,7 @@ float3 SampleLI(int pixel_index, inout float pdf, inout float3 wi) {
 
         float du = Rand.x - CDFY[int2(v, 0)];
         float diff = (CDFY[int2(v + 1, 0)] - CDFY[int2(v, 0)]);
-        if(diff > 0)
-            du /= diff;
+        if(diff > 0) du *= rcp(diff);
 
         uv.y = ((float)v + du) / HDRIParams.y;
     }
@@ -1908,8 +1699,7 @@ float3 SampleLI(int pixel_index, inout float pdf, inout float3 wi) {
         offset = FindInterval(HDRIParams.x, Rand.y, CDFX, v);
         float du = Rand.y - CDFX[int2(offset, v)];
         float diff = (CDFX[int2(offset + 1, v)] - CDFX[int2(offset, v)]);
-        if(diff > 0)
-            du /= diff;
+        if(diff > 0) du *= rcp(diff);
 
         uv.x = ((float)offset + du) / HDRIParams.x;
     }
@@ -1919,16 +1709,16 @@ float3 SampleLI(int pixel_index, inout float pdf, inout float3 wi) {
     return _SkyboxTexture.SampleLevel(my_linear_clamp_sampler, uv, 0);
 }	
 
-uint GetBounceData(uint A) {
+inline uint GetBounceData(const uint A) {
 	return (A & 0x7C000000) >> 26;
 }
-uint ToColorSpecPackedAdd(float3 A, uint B) {
+inline uint ToColorSpecPackedAdd(const float3 A, const uint B) {
 	return (B & ~0xFFFFFE00) | ((uint)(A.x * 1022.0f)) | ((uint)(A.y * 1022.0f) << 10) | ((uint)A.z << 20);
 }
-uint ToColorSpecPacked(float3 A) {
+inline uint ToColorSpecPacked(const float3 A) {
 	return ((uint)(A.x * 1022.0f)) | ((uint)(A.y * 1022.0f) << 10) | ((uint)A.z << 20);
 }
-float3 FromColorSpecPacked(uint A) {
+inline float3 FromColorSpecPacked(const uint A) {
 	return float3(
 		(A & 0x3FF) / 1022.0f,
 		((A >> 10) & 0x3FF) / 1022.0f,
@@ -1950,18 +1740,6 @@ inline void CalcPosNorm(uint4 TriData, inout float3 Pos, inout float3 Norm) {
 
 }
 
-inline void CalcPosOnly(uint4 TriData, inout float3 Pos) {
-	if(TriData.w == 99993) {
-		Pos = asfloat(TriData.xyz);
-	} else {
-	    MyMeshDataCompacted Mesh = _MeshData[TriData.x];
-	    float4x4 Inverse = inverse(Mesh.W2L);
-	    TriData.y += Mesh.TriOffset;
-		Pos = mul(Inverse, float4(AggTrisA[TriData.y].pos0 + asfloat(TriData.z) * AggTrisA[TriData.y].posedge1 + asfloat(TriData.w) * AggTrisA[TriData.y].posedge2,1)).xyz;		
-	}
-
-}
-
 inline float3 CalcPos(uint4 TriData) {
 	if(TriData.w == 99993) return asfloat(TriData.xyz);
     MyMeshDataCompacted Mesh = _MeshData[TriData.x];
@@ -1969,8 +1747,6 @@ inline float3 CalcPos(uint4 TriData) {
     TriData.y += Mesh.TriOffset;
 	return mul(Inverse, float4(AggTrisA[TriData.y].pos0 + asfloat(TriData.z) * AggTrisA[TriData.y].posedge1 + asfloat(TriData.w) * AggTrisA[TriData.y].posedge2,1)).xyz;
 }
-
-
 
 inline int SelectUnityLight(int pixel_index, inout float lightWeight, float3 Norm, float3 Position, float3 RayDir) {
     float2 Rand;
@@ -1984,18 +1760,17 @@ inline int SelectUnityLight(int pixel_index, inout float lightWeight, float3 Nor
     if(RISCount == 0) {
     	lightWeight *= (float)unitylightcount;
 	    return clamp(( random(11, pixel_index).x * unitylightcount), 0, unitylightcount - 1);
-
     }
     const float3 RandVecMain = float3(random(115, pixel_index), random(116, pixel_index).x);
     const float RandVecW = random(116, pixel_index).y;
-    for(int i = 0; i < RISCount + 1; i++) {
+    for(int i = 0; i <= RISCount; i++) {
         float3 RandVec = RandVecMain;
         Rand = random(i + 11, pixel_index);
         Index = clamp((Rand.x * unitylightcount), 0, unitylightcount - 1);
         LightData light = _UnityLights[Index];
 
         float3 MiscInfo = float3(light.Softness * 120.0f + 1, light.SpotAngle);
-        if(light.Type == AREALIGHTQUAD|| light.Type == AREALIGHTDISK) {
+        if(light.Type == AREALIGHTQUAD || light.Type == AREALIGHTDISK) {
             float sinPhi, cosPhi;
             sincos(light.ZAxisRotation, sinPhi, cosPhi);
             switch(light.Type) {
@@ -2014,18 +1789,16 @@ inline int SelectUnityLight(int pixel_index, inout float lightWeight, float3 Nor
 
             to_light = light.Position - Position;
             LengthSquared = dot(to_light, to_light);
-            to_light /= sqrt(LengthSquared);
+            to_light *= rsqrt(LengthSquared);
             light.Radiance *= pow(saturate(dot(to_light, -light.Direction)), MiscInfo.x) * (MiscInfo.x);
             float PDF = saturate(dot(to_light, -light.Direction));
-            if(PDF > 0) p_hat = max(luminance(light.Radiance) / (LengthSquared * max(PDF, 0.1f)),0);
+            if(PDF > 0) p_hat = max(luminance(light.Radiance) * rcp(LengthSquared * max(PDF, 0.1f)),0);
         	else p_hat = 0;
         } else {
-        	if(light.Type != DIRECTIONALLIGHT) {
-                light.Position += normalize(RandVec - 0.5f) * RandVecW * light.Softness * 0.1f;//Soft Shadows
-        	}
+        	if(light.Type != DIRECTIONALLIGHT) light.Position += normalize(RandVec - 0.5f) * RandVecW * light.Softness * 0.1f;//Soft Shadows
 	        to_light = (light.Type == DIRECTIONALLIGHT ? (light.Direction * 120000.0f + Position) : light.Position) - Position;
         	LengthSquared = dot(to_light, to_light);
-        	to_light /= sqrt(LengthSquared);
+        	to_light *= rsqrt(LengthSquared);
         	if(light.Type == SPOTLIGHT) {
                 light.Radiance *= ((1.0f - MiscInfo.z * 0.0174533) + (MiscInfo.y * 0.0174533 - MiscInfo.z * 0.0174533) / 2.0f);
                 light.Radiance *= saturate(saturate(dot(to_light, -light.Direction)) * MiscInfo.y + MiscInfo.z);
@@ -2033,25 +1806,22 @@ inline int SelectUnityLight(int pixel_index, inout float lightWeight, float3 Nor
             p_hat = max(luminance(light.Radiance) / ((light.Type == DIRECTIONALLIGHT) ? 12.0f : LengthSquared) * (dot(to_light, Norm) > 0),0);
         }
         wsum += p_hat;
-        if(Rand.y < p_hat / wsum) {
+        if(Rand.y < p_hat * rcp(wsum)) {
             MinIndex = Index;
             MinP_Hat = p_hat;
         }
-
     }
-    lightWeight *= (wsum / max((RISCount + 1) *MinP_Hat, 0.000001f)) * (float)unitylightcount;
+    lightWeight *= (wsum / max((RISCount + 1) * MinP_Hat, 0.000001f)) * (float)unitylightcount;
     return MinIndex;
 }
 
 
 inline int SelectLight(const uint pixel_index, inout uint MeshIndex, inout float lightWeight, float3 Norm, float3 Position, float4x4 Transform, inout float3 Radiance, inout float3 FinalPos, float2 sharpness, float3 viewDir, float metallic) {//Need to check these to make sure they arnt simply doing uniform sampling
-
-    float2 TriangleUV;
-    int MeshTriOffset = _MeshData[_LightMeshes[MeshIndex].LockedMeshIndex].TriOffset;
-    int MinIndex = 0;
-    int MatOffset =_MeshData[_LightMeshes[MeshIndex].LockedMeshIndex].MaterialOffset;
-    float2 FinalUV;
+    float2 TriangleUV, FinalUV;
+    int MeshTriOffset, MatOffset, MinIndex = 0;
     #ifndef LBVH
+    	MeshTriOffset = _MeshData[_LightMeshes[MeshIndex].LockedMeshIndex].TriOffset;
+    	MatOffset =_MeshData[_LightMeshes[MeshIndex].LockedMeshIndex].MaterialOffset;
         const int StartIndex = _LightMeshes[MeshIndex].StartIndex;
         const int LightCount = _LightMeshes[MeshIndex].IndexEnd - StartIndex;
         float3x3 Inverse = (float3x3)inverse(Transform);
@@ -2070,7 +1840,7 @@ inline int SelectLight(const uint pixel_index, inout uint MeshIndex, inout float
         float3 LightPosition;
         float p_hat;
         int CounCoun = 0;
-        for(int i = 0; i < RISCount + 1; i++) {
+        for(int i = 0; i <= RISCount; i++) {
             Rand = random(46+i, pixel_index);
             Index = (Rand.x * LightCount) + StartIndex;
             Rand2 = random(79 + i, pixel_index);
@@ -2115,8 +1885,7 @@ inline int SelectLight(const uint pixel_index, inout uint MeshIndex, inout float
     	if(GetFlag(TTMat.Tag, IsBackground)) return -1;
     #endif
     float2 BaseUv = TOHALF(AggTrisA[AggTriIndex].tex0) * (1.0f - FinalUV.x - FinalUV.y) + TOHALF(AggTrisA[AggTriIndex].texedge1) * FinalUV.x + TOHALF(AggTrisA[AggTriIndex].texedge2) * FinalUV.y;
-    if(TTMat.AlbedoTex.x > 0)
-    	TTMat.surfaceColor *= SampleTexture(BaseUv, SampleAlbedo, TTMat);
+    if(TTMat.AlbedoTex.x > 0) TTMat.surfaceColor *= SampleTexture(BaseUv, SampleAlbedo, TTMat);
 
     float3 TempCol = TTMat.surfaceColor;
     Unity_Hue_Degrees_float(TempCol, TTMat.Hue * 500.0f, TTMat.surfaceColor);
@@ -2125,7 +1894,6 @@ inline int SelectLight(const uint pixel_index, inout uint MeshIndex, inout float
     Unity_Saturation_float(TempCol, TTMat.Saturation, TTMat.surfaceColor);
     Unity_Contrast_float(TTMat.surfaceColor, TTMat.Contrast);
     TTMat.surfaceColor = saturate(TTMat.surfaceColor);
-
 
     {
         [branch]if(TTMat.MatCapTex.x > 0) {
@@ -2144,7 +1912,6 @@ inline int SelectLight(const uint pixel_index, inout uint MeshIndex, inout float
             else TTMat.surfaceColor = matcap.xyz;
         }
     }
-
 
     if(TTMat.emission > 0) {
         if (TTMat.EmissiveTex.x > 0) {
@@ -2177,23 +1944,20 @@ float4 HandleDebug(int Index) {
     return float4(pal(LinearIndex), 1);
 }
 
-
-
-float3 SampleDirectionSphere(float u1, float u2)
-{
+inline float3 SampleDirectionSphere(float u1, float u2) {
     float z = u1 * 2.0f - 1.0f;
     float r = sqrt(max(0.0f, 1.0f - z * z));
-    float phi = 2 * PI * u2;
-    float x = r * cos(phi);
-    float y = r * sin(phi);
-
+    float phi = 2.0f * PI * u2;
+    float x, y;
+    sincos(phi, y, x);
+    x *= r; y *= r;
     return float3(x, y, z);
 }
 
 #define BucketCount 4
 #define PropDepth 5
 #define CacheCapacity (BucketCount * 1024 * 1024)
-static const uint HashOffset = (4 * 1024 * 1024 * 16);
+static const uint HashOffset = (BucketCount * 1024 * 1024 * 16);
 
 RWByteAddressBuffer VoxelDataBufferA;
 ByteAddressBuffer VoxelDataBufferB;
@@ -2203,7 +1967,6 @@ struct PropogatedCacheData {
 	uint RunningIlluminance;//this gets cleared every bounce basically, since the last NEE and last bounce share the same normal
 };
 RWStructuredBuffer<PropogatedCacheData> CacheBuffer;
-
 
 
 inline uint Hash32Bit(uint a) {
@@ -2217,39 +1980,37 @@ inline uint Hash32Bit(uint a) {
     return a;
 }
 
-
 //double hash counting? take advantage of the hash collisions to store multiple values per hash?
 inline uint GenHash(float3 Pos, float3 Norm) {
 	Pos = abs(Pos) < 0.00001f ? 0.00001f : Pos;
-    int Layer = max(floor(log2(length(CamPos - Pos)) + 1), 1);//length() seems to work better, but I reallly wanna find a way to make Dot() work, as thats wayyyy faster
+    int Layer = max(floor(0.5f * log2(dot(CamPos - Pos, CamPos - Pos)) + 1), 1);//length() seems to work better, but I reallly wanna find a way to make Dot() work, as thats wayyyy faster
 
-    Pos = floor(Pos * 35.0f / pow(2, Layer));
+    Pos = floor(Pos * 35.0f / (float)(1 << Layer));
     uint3 Pos2 = asuint((int3)Pos);
     uint ThisHash = ((Pos2.x & 255) << 0) | ((Pos2.y & 255) << 8) | ((Pos2.z & 255) << 16);
     ThisHash |= (Layer & 31) << 24;
 
-    Norm  = i_octahedral_32(octahedral_32(Norm));
     uint NormHash =
-        (Norm.x >= 0 ? 1 : 0) +
-        (Norm.y >= 0 ? 2 : 0) +
-        (Norm.z >= 0 ? 4 : 0);
+        ((uint)(Norm.x >= 1e-7f)) |
+        ((uint)(Norm.y >= 1e-7f) << 1) |
+        ((uint)(Norm.z >= 1e-7f) << 2);
 
     ThisHash |= (NormHash) << 29;
     return ThisHash;
 }
 
-inline uint GenHashPrecompedLayer(float3 Pos, const int Layer, const float3 Norm) {
+inline uint GenHashPrecompedLayer(float3 Pos, const int Layer, float3 Norm) {
 	Pos = abs(Pos) < 0.00001f ? 0.00001f : Pos;
 
-    Pos = floor(Pos * 35.0f / pow(2, Layer));
+    Pos = floor(Pos * 35.0f / (float)(1 << Layer));
     uint3 Pos2 = asuint((int3)Pos);
     uint ThisHash = ((Pos2.x & 255) << 0) | ((Pos2.y & 255) << 8) | ((Pos2.z & 255) << 16);
     ThisHash |= (Layer & 31) << 24;
 
     uint NormHash =
-        (Norm.x >= 0 ? 1 : 0) +
-        (Norm.y >= 0 ? 2 : 0) +
-        (Norm.z >= 0 ? 4 : 0);
+        ((uint)(Norm.x >= 1e-7f)) |
+        ((uint)(Norm.y >= 1e-7f) << 1) |
+        ((uint)(Norm.z >= 1e-7f) << 2);
 
     ThisHash |= (NormHash) << 29;
     return ThisHash;
@@ -2257,15 +2018,15 @@ inline uint GenHashPrecompedLayer(float3 Pos, const int Layer, const float3 Norm
 
 inline float GetVoxSize(float3 Pos, inout int Layer) {
 	Pos = abs(Pos) < 0.00001f ? 0.00001f : Pos;
-    Layer = max(floor(log2(length(CamPos - Pos)) + 1), 1);
-    return pow(2, Layer) / 35.0f;
+    Layer = max(floor(0.5f * log2(dot(CamPos - Pos, CamPos - Pos)) + 1), 1);
+    return (float)(1 << Layer) / 35.0f;
 }
 
 inline uint GenHashComputedNorm(float3 Pos, uint NormHash) {
 	Pos = abs(Pos) < 0.00001f ? 0.00001f : Pos;
-    int Layer = max(floor(log2(length(CamPos - Pos)) + 1), 1);//length() seems to work better, but I reallly wanna find a way to make Dot() work, as thats wayyyy faster
+    int Layer = max(floor(0.5f * log2(dot(CamPos - Pos, CamPos - Pos)) + 1), 1);//length() seems to work better, but I reallly wanna find a way to make Dot() work, as thats wayyyy faster
 
-    Pos = floor(Pos * 35.0f / pow(2, Layer));
+    Pos = floor(Pos * 35.0f / (float)(1 << Layer));
     uint3 Pos2 = asuint((int3)Pos);
     uint ThisHash = ((Pos2.x & 255) << 0) | ((Pos2.y & 255) << 8) | ((Pos2.z & 255) << 16);
     ThisHash |= (Layer & 31) << 24;
@@ -2289,147 +2050,104 @@ inline bool FindHashEntry(const uint HashValue, inout uint cacheEntry) {
 }
 
 
-	struct GridVoxel {
-	    float3 radiance;
-	    uint SampleNum;
-	    uint FrameNum;
-	};
+struct GridVoxel {
+    float3 radiance;
+    uint SampleNum;
+    uint FrameNum;
+};
 
-	inline GridVoxel RetrieveCacheData(uint CacheEntry2) {
-		uint CacheEntry = CacheEntry2;
-		[branch]if(!FindHashEntry(CacheEntry2, CacheEntry)) return (GridVoxel)0;
-	    else {
-	    	uint4 voxelDataPacked = VoxelDataBufferB.Load4(CacheEntry * 16);
+inline GridVoxel RetrieveCacheData(uint CacheEntry2) {
+	uint CacheEntry = CacheEntry2;
+	[branch]if(!FindHashEntry(CacheEntry2, CacheEntry)) return (GridVoxel)0;
+    else {
+    	uint4 voxelDataPacked = VoxelDataBufferB.Load4(CacheEntry * 16);
+	    GridVoxel Voxel;
+		Voxel.radiance = (float3)voxelDataPacked.xyz / 1e3f;
+	    Voxel.SampleNum = voxelDataPacked.w & 0x00FFFFFF;
+	    Voxel.FrameNum = (voxelDataPacked.w >> 24) & 0xFF;
+	    return Voxel;
+	}
+}
 
-		    GridVoxel Voxel;
-			Voxel.radiance = (float3)voxelDataPacked.xyz / 1e3f;
-		    Voxel.SampleNum = voxelDataPacked.w & 0x00FFFFFF;
-		    Voxel.FrameNum = (voxelDataPacked.w >> 24) & 0xFF;
+inline void AddVoxelData(uint CacheEntry, uint4 Values) {
+    CacheEntry *= 16;
+    [unroll]for(int i = 0; i < 4; i++)
+    	if(Values[i] != 0) VoxelDataBufferA.InterlockedAdd(CacheEntry + 4 * i, Values[i]);//move to gaussians later, requires a full compressor every bounce tho since I cant rely on interlockedadds
+}
 
-		    return Voxel;
+inline uint FindOpenEntryInHash(const uint HashValue) {
+	uint BucketContents;
+    uint HashIndex = Hash32Bit(HashValue) % CacheCapacity;
+    uint baseSlot = floor(HashIndex / (float)BucketCount) * BucketCount;
+	if(baseSlot < CacheCapacity) {
+		[unroll]for(int i = 0; i < BucketCount; i++) {	
+			VoxelDataBufferA.InterlockedCompareExchange(HashOffset + (baseSlot + i) * 4, 0, HashValue, BucketContents);
+			if(BucketContents == 0 || BucketContents == HashValue)
+				return baseSlot + i;
 		}
 	}
+	return 0;
+}
 
-	inline void AddVoxelData(uint CacheEntry, uint4 Values) {
-	    CacheEntry *= 16;
-	    [unroll]for(int i = 0; i < 4; i++)
-	    	if(Values[i] != 0) VoxelDataBufferA.InterlockedAdd(CacheEntry + 4 * i, Values[i]);//move to gaussians later, requires a full compressor every bounce tho since I cant rely on interlockedadds
+
+inline bool AddHitToCacheFull(inout PropogatedCacheData CurrentProp, inout uint PathLength, const float3 Pos, const float3 bsdf) {//Run every frame in shading due to 
+	float3 RunningIlluminance = unpackRGBE(CurrentProp.RunningIlluminance);
+	uint CurHash = FindOpenEntryInHash(GenHashComputedNorm(Pos, (PathLength >> 3) & 7));
+	if(CurHash == 0) return false;
+	uint ActualPropDepth = min(PathLength & 7, PropDepth);
+	AddVoxelData(CurHash, uint4(RunningIlluminance * 1e3f, 1));
+	for(uint i = 0; i < ActualPropDepth; i++) {
+		RunningIlluminance *= unpackRGBE(CurrentProp.samples[i].x);
+		AddVoxelData(CurrentProp.samples[i].y, uint4(RunningIlluminance * 1e3f, 0));
 	}
 
-	inline uint FindOpenEntryInHash(const uint HashValue) {
-		uint BucketContents;
-	    uint HashIndex = Hash32Bit(HashValue) % CacheCapacity;
-	    uint baseSlot = floor(HashIndex / (float)BucketCount) * BucketCount;
-		if(baseSlot < CacheCapacity) {
-			[unroll]for(int i = 0; i < BucketCount; i++) {	
-				VoxelDataBufferA.InterlockedCompareExchange(HashOffset + (baseSlot + i) * 4, 0, HashValue, BucketContents);
-				if(BucketContents == 0 || BucketContents == HashValue) {
-					return baseSlot + i;
-				}
-			}
-		}
-		return 0;
+    if(ActualPropDepth >= 4) CurrentProp.samples[4] = CurrentProp.samples[3];
+    if(ActualPropDepth >= 3) CurrentProp.samples[3] = CurrentProp.samples[2];
+    if(ActualPropDepth >= 2) CurrentProp.samples[2] = CurrentProp.samples[1];
+    if(ActualPropDepth >= 1) CurrentProp.samples[1] = CurrentProp.samples[0];
+    CurrentProp.samples[0].y = CurHash;
+    CurrentProp.RunningIlluminance = 0;
+    CurrentProp.samples[0].x = packRGBE(bsdf);
+    return true;
+}
+
+
+inline bool AddHitToCachePartial(inout PropogatedCacheData CurrentProp, float3 Pos) {//Run every frame in shading due to 
+	float3 RunningIlluminance = unpackRGBE(CurrentProp.RunningIlluminance);
+	uint CurHash = FindOpenEntryInHash(GenHashComputedNorm(Pos, (CurrentProp.pathLength >> 3) & 7));
+	if(CurHash == 0) return false;
+	uint ActualPropDepth = min(CurrentProp.pathLength & 7, PropDepth);
+	AddVoxelData(CurHash, uint4(RunningIlluminance * 1e3f, 1));
+    for(uint i = 0; i < ActualPropDepth; i++) {
+		RunningIlluminance *= unpackRGBE(CurrentProp.samples[i].x);
+		AddVoxelData(CurrentProp.samples[i].y, uint4(RunningIlluminance * 1e3f, 0));
 	}
+    CurrentProp.RunningIlluminance = 0;
+    return true;
+}
 
-
-	inline bool AddHitToCacheFull(inout PropogatedCacheData CurrentProp, inout uint PathLength, const float3 Pos, const float3 bsdf) {//Run every frame in shading due to 
-		float3 RunningIlluminance = unpackRGBE(CurrentProp.RunningIlluminance);
-		uint CurHash = FindOpenEntryInHash(GenHashComputedNorm(Pos, (PathLength >> 3) & 7));
-		if(CurHash == 0) return false;
-		uint ActualPropDepth = min(PathLength & 7, PropDepth);
-		AddVoxelData(CurHash, uint4(RunningIlluminance * 1e3f, 1));
-		for(uint i = 0; i < ActualPropDepth; i++) {
-			RunningIlluminance *= unpackRGBE(CurrentProp.samples[i].x);
-			AddVoxelData(CurrentProp.samples[i].y, uint4(RunningIlluminance * 1e3f, 0));
-		}
-
-        if(ActualPropDepth >= 4) CurrentProp.samples[4] = CurrentProp.samples[3];
-        if(ActualPropDepth >= 3) CurrentProp.samples[3] = CurrentProp.samples[2];
-        if(ActualPropDepth >= 2) CurrentProp.samples[2] = CurrentProp.samples[1];
-        if(ActualPropDepth >= 1) CurrentProp.samples[1] = CurrentProp.samples[0];
-        CurrentProp.samples[0].y = CurHash;
-        CurrentProp.RunningIlluminance = 0;
-        CurrentProp.samples[0].x = packRGBE(bsdf);
-        return true;
-	}
-
-
-	inline bool AddHitToCachePartial(inout PropogatedCacheData CurrentProp, float3 Pos) {//Run every frame in shading due to 
-		float3 RunningIlluminance = unpackRGBE(CurrentProp.RunningIlluminance);
-		uint CurHash = FindOpenEntryInHash(GenHashComputedNorm(Pos, (CurrentProp.pathLength >> 3) & 7));
-		if(CurHash == 0) return false;
-		uint ActualPropDepth = min(CurrentProp.pathLength & 7, PropDepth);
-		AddVoxelData(CurHash, uint4(RunningIlluminance * 1e3f, 1));
-        for(uint i = 0; i < ActualPropDepth; i++) {
-			RunningIlluminance *= unpackRGBE(CurrentProp.samples[i].x);
-			AddVoxelData(CurrentProp.samples[i].y, uint4(RunningIlluminance * 1e3f, 0));
-		}
-        CurrentProp.RunningIlluminance = 0;
-        return true;
-	}
-
-
-
-bool plane_distance_disocclusion_check(float3 current_pos, float3 history_pos, float3 current_normal)
-{
+inline bool plane_distance_disocclusion_check(const float3 current_pos, const float3 history_pos, const float3 current_normal) {
     float3  to_current    = current_pos - history_pos;
     float dist_to_plane = abs(dot(to_current, current_normal));
-
     return dist_to_plane > 0.01f;
 }
 
-
-
-#define FLT_EPS 5.960464478e-8
-
-// 'height' is the altitude.
-// 'cosTheta' is the Z component of the ray direction.
-// 'dist' is the distance.
-// seaLvlExt = (sigma_t * b) is the sea-level (height = 0) extinction coefficient.
-// n = (1 / H) is the falloff exponent, where 'H' is the scale height.
-float3 OptDepthRectExpMedium(float height, float cosTheta, float dist,
-                               float3 seaLvlExt, float n)
-{
-    float p = -cosTheta * n;
-
-    // Equation 26.
-    float3 optDepth = seaLvlExt * dist;
-
-    if (abs(p) > FLT_EPS) // Uniformity check
-    {
-        // Equation 34.
-        optDepth = seaLvlExt * rcp(p) * exp(height * n) * (exp(p * dist) - 1);
-    }
-
-    return optDepth;
-}
 
 // 'optDepth' is the value of optical depth.
 // 'height' is the altitude.
 // 'cosTheta' is the Z component of the ray direction.
 // seaLvlExtRcp = (1 / seaLvlExt).
 // n = (1 / H) is the falloff exponent, where 'H' is the scale height.
-float SampleRectExpMedium(float optDepth, float height, float cosTheta,
-                          float seaLvlExtRcp, float n)
-{
+inline float SampleRectExpMedium(float optDepth, float height, float cosTheta, float seaLvlExtRcp, float n) {
     float p = -cosTheta * n;
-
-    // Equation 27.
     float dist = optDepth * seaLvlExtRcp;
-
-    if (abs(p) > FLT_EPS) // Uniformity check
-    {
-        // Equation 35.
-        dist = rcp(p) * log(1 + dist * p * exp(height * n));
-    }
-
+    if (abs(p) > 5.960464478e-8f) dist = rcp(p) * log(1 + dist * p * exp(height * n));
     return dist;
 }
 
 // Max Abs Error: 0.000000969658452.
 // Max Rel Error: 0.000001091639525.
-float Exp2Erfc(float x)
-{
+float Exp2Erfc(float x) {
     float t, u, y;
 
     t = 3.9788608f * rcp(x + 3.9788608f); // Reduce the range
@@ -2679,20 +2397,20 @@ float SampleSpherExpMedium(float optDepth, float r, float rRcp, float cosTheta, 
 }
 
 
-float HenyeyGreenstein(float g, float mu) {
+inline float HenyeyGreenstein(float g, float mu) {
     float gg = g * g;
     return (1.0 / (4.0 * PI)) * ((1.0 - gg) / pow(1.0 + gg - 2.0 * g * mu, 1.5));
 }
 
-float DualHenyeyGreenstein(float g, float costh) {
+inline float DualHenyeyGreenstein(float g, float costh) {
     return lerp(HenyeyGreenstein(-g, costh), HenyeyGreenstein(g, costh), 0.7f);
 }
 
-float PhaseFunction(float g, float costh) {
+inline float PhaseFunction(float g, float costh) {
     return DualHenyeyGreenstein(g, costh);
 }
 
-float3 MultipleOctaveScattering(float density, float mu) {
+inline float3 MultipleOctaveScattering(float density, float mu) {
     float attenuation = 0.2;
     float contribution = 0.2;
     float phaseAttenuation = 0.5;
@@ -2701,11 +2419,10 @@ float3 MultipleOctaveScattering(float density, float mu) {
     float b = 1.0;
     float c = 1.0;
     float g = 0.85;
-    const float scatteringOctaves = 4.0;
 
     float3 luminance = 0.0;
 
-    for (float i = 0.0; i < scatteringOctaves; i++) {
+    [unroll]for (int i = 0; i < 4; i++) {
         float phaseFunction = PhaseFunction(0.3 * c, mu);
         float3 beers = exp(-density * float3(0.8, 0.8, 1) * a);
 
@@ -2720,7 +2437,7 @@ float3 MultipleOctaveScattering(float density, float mu) {
 
 
 
-float3 waveLengthToRGB(float Wavelength) {
+inline float3 waveLengthToRGB(float Wavelength) {
     const float Gamma = 0.80;
 
     float factor;
@@ -2775,15 +2492,13 @@ float3 waveLengthToRGB(float Wavelength) {
 #define DRAINE_A 32.0
 
 
-float phase_draine_eval(const float u, const float g, const float a)
-{
+float phase_draine_eval(const float u, const float g, const float a) {
     return ((1 - g*g)*(1 + a*u*u))/(4.*(1 + (a*(1 + 2*g*g))/3.) * PI * pow(1 + g*g - 2*g*u,1.5));
 }
 
 // sample: (sample an exact deflection cosine)
 //   xi = a uniform random real in [0,1]
-float phase_draine_sample(const float xi, const float g, const float a)
-{
+float phase_draine_sample(const float xi, const float g, const float a) {
     const float g2 = g * g;
     const float g3 = g * g2;
     const float g4 = g2 * g2;

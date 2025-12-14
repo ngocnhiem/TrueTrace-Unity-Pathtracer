@@ -148,6 +148,19 @@ namespace TrueTrace {
             }
             return;
         }
+        void TraverseChildren(Transform Trans, ref List<ParentObject> AddedList) {
+            if(Trans.gameObject.TryGetComponent<MeshFilter>(out MeshFilter ValidFilter)) {
+                AddedList.Add(Trans.gameObject.AddComponent<ParentObject>());
+                Trans.gameObject.AddComponent<RayTracingObject>();
+            }
+            int ChildCount = Trans.childCount;
+            if(Trans.gameObject.TryGetComponent<LODGroup>(out LODGroup GroupTarg)) {
+               ChildCount = Mathf.Min(ChildCount, 1);
+            }
+            for(int i = 0; i < ChildCount; i++) {
+                TraverseChildren(Trans.GetChild(i), ref AddedList);
+            }
+        }
 
         public void Load()
         {
@@ -196,40 +209,53 @@ namespace TrueTrace {
 
 
             Trees = TerrainTile.terrainData.treeInstances;
-            TreePrototype[] TreeObjects = TerrainTile.terrainData.treePrototypes;
-            InstancedManager Instanced = GameObject.Find("InstancedStorage").GetComponent<InstancedManager>();
-            List<GameObject> TreeSources = new List<GameObject>();
-            foreach (TreePrototype Tree in TreeObjects)
-            {
-                if (!Instanced.transform.Find(Tree.prefab.name + "(Clone)"))
-                {
-                    GameObject TempObject = GameObject.Instantiate(Tree.prefab, Instanced.transform);
-                    TempObject.AddComponent<ParentObject>();
-                    TempObject.AddComponent<RayTracingObject>();
-                    TreeSources.Add(TempObject);
-                }
-                else
-                {
-                    TreeSources.Add(Instanced.transform.Find(Tree.prefab.name + "(Clone)").gameObject);
-                }
-            }
+            if (this.gameObject.transform.childCount == 0) {
+               TreePrototype[] TreeObjects = TerrainTile.terrainData.treePrototypes;
+               InstancedManager Instanced = GameObject.Find("InstancedStorage").GetComponent<InstancedManager>();
+               List<GameObject> TreeSources = new List<GameObject>();
+               Dictionary<GameObject, List<ParentObject>> TerrainObjs = new Dictionary<GameObject, List<ParentObject>>();
+
+               Dictionary<string, GameObject> AddedObjects = new Dictionary<string, GameObject>();
+
+               foreach (TreePrototype Tree in TreeObjects) {
+                   if (!AddedObjects.TryGetValue(Tree.prefab.name + "(Clone)", out GameObject TreeSource)) {
+                       GameObject TempObject = GameObject.Instantiate(Tree.prefab, Instanced.transform);
+                       List<ParentObject> NewList = new List<ParentObject>();
+                       TraverseChildren(TempObject.transform, ref NewList);
+                       TerrainObjs.Add(TempObject, NewList);
+                       TreeSources.Add(TempObject);
+                       AddedObjects.Add(Tree.prefab.name + "(Clone)", TempObject);
+                   } else {
+                       TreeSources.Add(TreeSource);
+                   }
+               }
 
 
 
 
 
 
-            if (this.gameObject.transform.childCount == 0)
-            {
                 foreach (var Tree in Trees)
                 {
-                    GameObject TempGameObject = new GameObject();
-                    TempGameObject.transform.parent = this.gameObject.transform;
-                    TempGameObject.AddComponent<InstancedObject>();
-                    TempGameObject.GetComponent<InstancedObject>().InstanceParent = GameObject.Find(TreeSources[Tree.prototypeIndex].name).GetComponent<ParentObject>();
-                    TempGameObject.transform.position = new Vector3(Tree.position.x * TerrainDimX, Tree.position.y * HeightScale, Tree.position.z * TerrainDimY) + this.transform.position;
-                    TempGameObject.transform.localScale = new Vector3(Tree.widthScale, Tree.heightScale, Tree.widthScale);
-
+                    GameObject TempGameObjectParent = new GameObject();
+                    TempGameObjectParent.transform.parent = this.gameObject.transform;
+                    TempGameObjectParent.transform.position = new Vector3(Tree.position.x * TerrainDimX, Tree.position.y * HeightScale, Tree.position.z * TerrainDimY) + this.transform.position;
+                    TempGameObjectParent.transform.localScale = new Vector3(Tree.widthScale, Tree.heightScale, Tree.widthScale);
+                    List<ParentObject> TempList = TerrainObjs[TreeSources[Tree.prototypeIndex]];
+                    int ObjectCount = TempList.Count;
+                    if(ObjectCount == 1) {
+                        TempGameObjectParent.AddComponent<InstancedObject>();
+                        TempGameObjectParent.GetComponent<InstancedObject>().InstanceParent = TempList[0];
+                    } else {
+                       for(int i = 0; i < ObjectCount; i++) {
+                           GameObject TempGameObject = new GameObject();
+                           TempGameObject.transform.parent = TempGameObjectParent.transform;
+                           TempGameObject.AddComponent<InstancedObject>();
+                           TempGameObject.GetComponent<InstancedObject>().InstanceParent = TempList[i];
+                           TempGameObject.transform.localPosition = new Vector3(TempList[i].gameObject.transform.localPosition.x, TempList[i].gameObject.transform.localPosition.y, TempList[i].gameObject.transform.localPosition.z);
+                           TempGameObject.transform.localScale = TempList[i].gameObject.transform.lossyScale;
+                       }
+                  }
                 }
             }
         }
